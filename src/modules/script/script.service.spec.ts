@@ -5,7 +5,6 @@ import { FilesystemService } from '../filesystem/filesystem.service';
 
 describe('ScriptService', () => {
   let service: ScriptService;
-  let filesystemService: FilesystemService;
 
   const mockFilesystemService = {
     saveToDebug: jest.fn(),
@@ -38,7 +37,6 @@ describe('ScriptService', () => {
     }).compile();
 
     service = module.get<ScriptService>(ScriptService);
-    filesystemService = module.get<FilesystemService>(FilesystemService);
   });
 
   it('should be defined', () => {

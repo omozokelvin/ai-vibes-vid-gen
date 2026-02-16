@@ -9,11 +9,6 @@ import { Job } from 'bull';
 
 describe('VideoGenerationProcessor', () => {
   let processor: VideoGenerationProcessor;
-  let scriptService: ScriptService;
-  let mediaService: MediaService;
-  let editorService: EditorService;
-  let publisherService: PublisherService;
-  let filesystemService: FilesystemService;
 
   const mockScriptService = {
     generateScript: jest.fn().mockResolvedValue({
@@ -60,11 +55,6 @@ describe('VideoGenerationProcessor', () => {
     }).compile();
 
     processor = module.get<VideoGenerationProcessor>(VideoGenerationProcessor);
-    scriptService = module.get<ScriptService>(ScriptService);
-    mediaService = module.get<MediaService>(MediaService);
-    editorService = module.get<EditorService>(EditorService);
-    publisherService = module.get<PublisherService>(PublisherService);
-    filesystemService = module.get<FilesystemService>(FilesystemService);
   });
 
   it('should be defined', () => {

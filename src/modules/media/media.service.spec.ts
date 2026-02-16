@@ -5,7 +5,6 @@ import { FilesystemService } from '../filesystem/filesystem.service';
 
 describe('MediaService', () => {
   let service: MediaService;
-  let filesystemService: FilesystemService;
 
   const mockFilesystemService = {
     saveToDebug: jest.fn(),
@@ -39,7 +38,6 @@ describe('MediaService', () => {
     }).compile();
 
     service = module.get<MediaService>(MediaService);
-    filesystemService = module.get<FilesystemService>(FilesystemService);
   });
 
   it('should be defined', () => {
