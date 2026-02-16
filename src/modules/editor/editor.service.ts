@@ -17,13 +17,16 @@ export class EditorService {
 
     try {
       // Step 1: Concatenate video clips
-      const concatenatedVideoPath = await this.concatenateVideos(mediaFiles.videoPaths, jobId);
+      const concatenatedVideoPath = await this.concatenateVideos(
+        mediaFiles.videoPaths,
+        jobId,
+      );
 
       // Step 2: Loop video to match audio duration if needed
       const loopedVideoPath = await this.loopVideoToMatchAudio(
         concatenatedVideoPath,
         mediaFiles.audioPath,
-        jobId
+        jobId,
       );
 
       // Step 3: Add audio and subtitles
@@ -31,7 +34,7 @@ export class EditorService {
         loopedVideoPath,
         mediaFiles.audioPath,
         mediaFiles.subtitlePath,
-        outputPath
+        outputPath,
       );
 
       this.logger.log(`Video assembly completed: ${outputPath}`);
@@ -42,10 +45,15 @@ export class EditorService {
     }
   }
 
-  private concatenateVideos(videoPaths: string[], jobId: string): Promise<string> {
+  private concatenateVideos(
+    videoPaths: string[],
+    jobId: string,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const outputPath = this.filesystemService.getTempPath(`${jobId}_concatenated.mp4`);
-      
+      const outputPath = this.filesystemService.getTempPath(
+        `${jobId}_concatenated.mp4`,
+      );
+
       this.logger.log(`Concatenating ${videoPaths.length} video clips`);
 
       const command = Ffmpeg();
@@ -73,7 +81,11 @@ export class EditorService {
     });
   }
 
-  private loopVideoToMatchAudio(videoPath: string, audioPath: string, jobId: string): Promise<string> {
+  private loopVideoToMatchAudio(
+    videoPath: string,
+    audioPath: string,
+    jobId: string,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       // First, get the duration of the audio
       Ffmpeg.ffprobe(audioPath, (err, metadata) => {
@@ -112,9 +124,15 @@ export class EditorService {
     });
   }
 
-  private trimVideo(videoPath: string, duration: number, jobId: string): Promise<string> {
+  private trimVideo(
+    videoPath: string,
+    duration: number,
+    jobId: string,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const outputPath = this.filesystemService.getTempPath(`${jobId}_trimmed.mp4`);
+      const outputPath = this.filesystemService.getTempPath(
+        `${jobId}_trimmed.mp4`,
+      );
 
       Ffmpeg(videoPath)
         .setDuration(duration)
@@ -131,9 +149,15 @@ export class EditorService {
     });
   }
 
-  private loopVideo(videoPath: string, targetDuration: number, jobId: string): Promise<string> {
+  private loopVideo(
+    videoPath: string,
+    targetDuration: number,
+    jobId: string,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const outputPath = this.filesystemService.getTempPath(`${jobId}_looped.mp4`);
+      const outputPath = this.filesystemService.getTempPath(
+        `${jobId}_looped.mp4`,
+      );
 
       Ffmpeg.ffprobe(videoPath, (err, metadata) => {
         if (err) {
@@ -144,7 +168,9 @@ export class EditorService {
         const videoDuration = metadata.format.duration;
         const loopCount = Math.ceil(targetDuration / videoDuration);
 
-        this.logger.log(`Looping video ${loopCount} times to match audio duration`);
+        this.logger.log(
+          `Looping video ${loopCount} times to match audio duration`,
+        );
 
         Ffmpeg(videoPath)
           .inputOptions([`-stream_loop ${loopCount - 1}`])
@@ -167,7 +193,7 @@ export class EditorService {
     videoPath: string,
     audioPath: string,
     subtitlePath: string,
-    outputPath: string
+    outputPath: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.logger.log('Adding audio and burning subtitles');

@@ -31,7 +31,15 @@ export class VideoGenerationProcessor {
 
   @Process('generate')
   async handleVideoGeneration(job: Job<VideoGenerationJobData>) {
-    const { jobId, prompt, uploadToYoutube, uploadToTiktok, title, description, tags } = job.data;
+    const {
+      jobId,
+      prompt,
+      uploadToYoutube,
+      uploadToTiktok,
+      title,
+      description,
+      tags,
+    } = job.data;
 
     this.logger.log(`Starting video generation job: ${jobId}`);
 
@@ -46,22 +54,32 @@ export class VideoGenerationProcessor {
 
       // Step 2: Generate media
       this.logger.log('Step 2: Generating media...');
-      const mediaFiles = await this.mediaService.generateMedia(scriptData, jobId);
+      const mediaFiles = await this.mediaService.generateMedia(
+        scriptData,
+        jobId,
+      );
       await job.progress(50);
 
       // Step 3: Assemble video
       this.logger.log('Step 3: Assembling video...');
-      const finalVideoPath = await this.editorService.assembleVideo(mediaFiles, jobId);
+      const finalVideoPath = await this.editorService.assembleVideo(
+        mediaFiles,
+        jobId,
+      );
       await job.progress(75);
 
       // Step 4: Upload to social media (if requested)
       let uploadUrls = {};
       if (uploadToYoutube || uploadToTiktok) {
         this.logger.log('Step 4: Uploading to social media...');
-        
+
         const videoTitle = title || `AI Generated Video: ${prompt}`;
-        const videoDescription = description || `This video was automatically generated about: ${prompt}`;
-        const videoTags = tags ? tags.split(',').map(t => t.trim()) : ['AI', 'Generated', 'Video'];
+        const videoDescription =
+          description ||
+          `This video was automatically generated about: ${prompt}`;
+        const videoTags = tags
+          ? tags.split(',').map((t) => t.trim())
+          : ['AI', 'Generated', 'Video'];
 
         uploadUrls = await this.publisherService.uploadToSocial(
           finalVideoPath,
@@ -88,7 +106,9 @@ export class VideoGenerationProcessor {
         scriptData,
       };
     } catch (error) {
-      this.logger.error(`Error in video generation job ${jobId}: ${error.message}`);
+      this.logger.error(
+        `Error in video generation job ${jobId}: ${error.message}`,
+      );
       throw error;
     }
   }

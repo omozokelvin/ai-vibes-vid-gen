@@ -6,9 +6,7 @@ import { VideoGenerationJobData } from './queues/video-generation.processor';
 
 @Controller('video')
 export class AppController {
-  constructor(
-    @InjectQueue('video-generation') private videoQueue: Queue,
-  ) {}
+  constructor(@InjectQueue('video-generation') private videoQueue: Queue) {}
 
   @Get()
   getHello(): string {
@@ -82,10 +80,14 @@ export class AppController {
       completed: completed.length,
       failed: failed.length,
       jobs: {
-        waiting: waiting.map(j => ({ id: j.id, data: j.data })),
-        active: active.map(j => ({ id: j.id, data: j.data })),
-        completed: completed.slice(0, 10).map(j => ({ id: j.id, data: j.data, result: j.returnvalue })),
-        failed: failed.slice(0, 10).map(j => ({ id: j.id, data: j.data, error: j.failedReason })),
+        waiting: waiting.map((j) => ({ id: j.id, data: j.data })),
+        active: active.map((j) => ({ id: j.id, data: j.data })),
+        completed: completed
+          .slice(0, 10)
+          .map((j) => ({ id: j.id, data: j.data, result: j.returnvalue })),
+        failed: failed
+          .slice(0, 10)
+          .map((j) => ({ id: j.id, data: j.data, error: j.failedReason })),
       },
     };
   }

@@ -37,7 +37,7 @@ export class FilesystemService implements OnModuleInit {
 
   saveToDebug(filename: string, content: any): string {
     const filePath = path.join(this.debugDir, filename);
-    
+
     if (typeof content === 'string') {
       fs.writeFileSync(filePath, content, 'utf-8');
     } else if (Buffer.isBuffer(content)) {
@@ -45,14 +45,14 @@ export class FilesystemService implements OnModuleInit {
     } else {
       fs.writeFileSync(filePath, JSON.stringify(content, null, 2), 'utf-8');
     }
-    
+
     this.logger.log(`Saved debug file: ${filePath}`);
     return filePath;
   }
 
   saveToTemp(filename: string, content: any): string {
     const filePath = path.join(this.tempDir, filename);
-    
+
     if (typeof content === 'string') {
       fs.writeFileSync(filePath, content, 'utf-8');
     } else if (Buffer.isBuffer(content)) {
@@ -60,7 +60,7 @@ export class FilesystemService implements OnModuleInit {
     } else {
       fs.writeFileSync(filePath, JSON.stringify(content, null, 2), 'utf-8');
     }
-    
+
     this.logger.log(`Saved temp file: ${filePath}`);
     return filePath;
   }
@@ -76,7 +76,7 @@ export class FilesystemService implements OnModuleInit {
   cleanupTemp(jobId: string) {
     const pattern = new RegExp(`^${jobId}_`);
     const files = fs.readdirSync(this.tempDir);
-    
+
     files.forEach((file) => {
       if (pattern.test(file)) {
         const filePath = path.join(this.tempDir, file);

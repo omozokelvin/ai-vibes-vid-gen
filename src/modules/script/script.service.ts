@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ScriptData, VisualPrompt, TimestampSegment } from '../../common/interfaces/video-generation.interface';
+import { ScriptData } from '../../common/interfaces/video-generation.interface';
 import { FilesystemService } from '../filesystem/filesystem.service';
 
 @Injectable()
@@ -70,10 +70,12 @@ Generate the JSON response now:`;
           .replace(/```\n/g, '')
           .replace(/```/g, '')
           .trim();
-        
+
         scriptData = JSON.parse(jsonText);
       } catch (parseError) {
-        this.logger.warn('Failed to parse Gemini response as JSON, using fallback');
+        this.logger.warn(
+          'Failed to parse Gemini response as JSON, using fallback',
+        );
         scriptData = this.createFallbackScript(prompt);
       }
 
@@ -136,8 +138,11 @@ Generate the JSON response now:`;
     if (!data.script) {
       data.script = 'Generated video content.';
     }
-    
-    if (!Array.isArray(data.visual_prompts) || data.visual_prompts.length === 0) {
+
+    if (
+      !Array.isArray(data.visual_prompts) ||
+      data.visual_prompts.length === 0
+    ) {
       data.visual_prompts = [
         { index: 0, prompt: 'Cinematic video scene', duration: 10 },
       ];
