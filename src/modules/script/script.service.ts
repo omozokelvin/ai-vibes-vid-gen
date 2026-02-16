@@ -22,6 +22,12 @@ export class ScriptService {
   async generateScript(prompt: string, jobId: string): Promise<ScriptData> {
     this.logger.log(`Generating script for prompt: ${prompt}`);
 
+    // If API key is not configured, return fallback immediately
+    if (!this.genAI) {
+      this.logger.warn('Gemini API key not configured, using fallback script');
+      return this.createFallbackScript(prompt);
+    }
+
     const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
 
     const systemPrompt = `You are a video script writer. Given a user prompt, generate a structured JSON response for a short video (30-60 seconds).

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScriptService } from '../src/modules/script/script.service';
 import { FilesystemModule } from '../src/modules/filesystem/filesystem.module';
 
@@ -8,8 +8,26 @@ describe('ScriptService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot(), FilesystemModule],
-      providers: [ScriptService],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+        }),
+        FilesystemModule,
+      ],
+      providers: [
+        ScriptService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'GEMINI_API_KEY') {
+                return undefined; // Return undefined to trigger fallback
+              }
+              return process.env[key];
+            }),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<ScriptService>(ScriptService);
@@ -19,7 +37,7 @@ describe('ScriptService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should generate fallback script when API fails', async () => {
+  it('should generate fallback script when API key is not configured', async () => {
     const jobId = 'test_job_' + Date.now();
     const prompt = 'test battleships';
 
