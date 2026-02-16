@@ -149,10 +149,7 @@ describe('MediaService', () => {
     it('should have correct media files structure', () => {
       const mediaFiles = {
         audioPath: './temp/job_123_audio.mp3',
-        videoPaths: [
-          './temp/job_123_clip_0.mp4',
-          './temp/job_123_clip_1.mp4',
-        ],
+        videoPaths: ['./temp/job_123_clip_0.mp4', './temp/job_123_clip_1.mp4'],
         subtitlePath: './temp/job_123_subtitles.srt',
       };
 
@@ -167,7 +164,7 @@ describe('MediaService', () => {
     it('should handle missing Hugging Face API key', () => {
       // Service should be created even without API key
       expect(service).toBeDefined();
-      
+
       // Access private property through reflection
       const hfApiKey = (service as any).hfApiKey;
       expect(hfApiKey).toBeUndefined();
@@ -176,9 +173,9 @@ describe('MediaService', () => {
     it('should use FilesystemService for path operations', () => {
       const jobId = 'test_job_999';
       const filename = `${jobId}_test.mp4`;
-      
+
       mockFilesystemService.getTempPath(filename);
-      
+
       expect(mockFilesystemService.getTempPath).toHaveBeenCalledWith(filename);
     });
   });

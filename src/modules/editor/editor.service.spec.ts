@@ -125,9 +125,7 @@ describe('EditorService', () => {
 
     it('should handle Unix paths correctly', () => {
       const unixPath = '/tmp/test_subtitles.srt';
-      const escapedPath = unixPath
-        .replace(/\\/g, '\\\\')
-        .replace(/:/g, '\\:');
+      const escapedPath = unixPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:');
 
       expect(escapedPath).toBe('/tmp/test_subtitles.srt');
     });
@@ -153,7 +151,7 @@ describe('EditorService', () => {
     it('should handle video longer than target', () => {
       const videoDuration = 60;
       const targetDuration = 30;
-      
+
       // In this case, video should be trimmed, not looped
       expect(videoDuration).toBeGreaterThan(targetDuration);
     });
@@ -162,7 +160,7 @@ describe('EditorService', () => {
   describe('FFmpeg Integration', () => {
     it('should use FilesystemService for temp directory', () => {
       const tempDir = mockFilesystemService.getTempDir();
-      
+
       expect(tempDir).toBe('./temp');
       expect(mockFilesystemService.getTempDir).toHaveBeenCalled();
     });
