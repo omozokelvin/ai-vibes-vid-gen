@@ -270,9 +270,46 @@ This system uses **100% free APIs and tools**:
 ## Development
 
 ### Running Tests
+
+The project includes both unit tests and integration tests.
+
+#### Run All Tests
 ```bash
 npm run test
 ```
+
+#### Run Integration/E2E Tests
+```bash
+npm run test:e2e
+```
+
+**Note:** Integration tests require Redis to be running. You can start Redis using Docker:
+```bash
+docker run -d -p 6379:6379 --name redis-test redis:alpine
+```
+
+#### Run Tests with Coverage
+```bash
+npm run test:cov
+```
+
+#### Run Tests in Watch Mode
+```bash
+npm run test:watch
+```
+
+### Test Structure
+
+- **Unit Tests**: Located in `test/` directory
+  - `filesystem.spec.ts`: Tests for filesystem service
+  - `script.spec.ts`: Tests for script generation service
+  
+- **Integration Tests**: 
+  - `app.e2e-spec.ts`: End-to-end tests for API endpoints
+    - Tests video generation endpoint
+    - Tests job status checking
+    - Tests job listing
+    - Tests input validation
 
 ### Linting
 ```bash
