@@ -22,10 +22,11 @@ export class ScriptService {
   async generateScript(prompt: string, jobId: string): Promise<ScriptData> {
     this.logger.log(`Generating script for prompt: ${prompt}`);
 
-    // If API key is not configured, return fallback immediately
     if (!this.genAI) {
-      this.logger.warn('Gemini API key not configured, using fallback script');
-      return this.createFallbackScript(prompt);
+      this.logger.warn('Gemini API not configured, using fallback script');
+      const fallbackScript = this.createFallbackScript(prompt);
+      this.filesystemService.saveToDebug(`${jobId}_script.json`, fallbackScript);
+      return fallbackScript;
     }
 
     const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
