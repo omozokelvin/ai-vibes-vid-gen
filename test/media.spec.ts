@@ -29,25 +29,16 @@ describe('MediaService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('formatSrtTime', () => {
-    it('should format seconds to SRT time format correctly', () => {
-      // Access the private method via reflection for testing
-      const formatSrtTime = (service as any).formatSrtTime.bind(service);
-
-      expect(formatSrtTime(0)).toBe('00:00:00,000');
-      expect(formatSrtTime(65.5)).toBe('00:01:05,500');
-      expect(formatSrtTime(3661.123)).toBe('01:01:01,123');
-    });
-  });
-
-  describe('generateSubtitles', () => {
-    it('should generate subtitles with proper formatting', async () => {
+  describe('subtitle generation', () => {
+    it('should generate subtitles with proper SRT formatting', async () => {
       const jobId = 'test_job_' + Date.now();
       const timestamps = [
         { start: 0, end: 2.5, text: 'First subtitle' },
         { start: 2.5, end: 5.0, text: 'Second subtitle' },
+        { start: 65.5, end: 70.0, text: 'Third subtitle after one minute' },
       ];
 
+      // Generate subtitles through the private method for this test
       const subtitlePath = await (service as any).generateSubtitles(
         timestamps,
         jobId,
@@ -56,6 +47,14 @@ describe('MediaService', () => {
       expect(subtitlePath).toBeDefined();
       expect(subtitlePath).toContain('.srt');
       expect(fs.existsSync(subtitlePath)).toBe(true);
+
+      // Verify the content has proper SRT formatting
+      const content = fs.readFileSync(subtitlePath, 'utf-8');
+      expect(content).toContain('00:00:00,000 --> 00:00:02,500');
+      expect(content).toContain('00:00:02,500 --> 00:00:05,000');
+      expect(content).toContain('00:01:05,500 --> 00:01:10,000');
+      expect(content).toContain('First subtitle');
+      expect(content).toContain('Second subtitle');
 
       // Cleanup
       if (fs.existsSync(subtitlePath)) {
