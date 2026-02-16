@@ -201,8 +201,8 @@ export class EditorService {
       // Properly escape subtitle path for FFmpeg filter
       // First escape backslashes, then escape colons
       const escapedSubtitlePath = subtitlePath
-        .replace(/\\/g, '\\\\')  // Escape backslashes first
-        .replace(/:/g, '\\:');    // Then escape colons
+        .replace(/\\/g, '\\\\') // Escape backslashes first
+        .replace(/:/g, '\\:'); // Then escape colons
 
       Ffmpeg(videoPath)
         .input(audioPath)
