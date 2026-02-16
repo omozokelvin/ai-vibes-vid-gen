@@ -25,7 +25,10 @@ export class ScriptService {
     if (!this.genAI) {
       this.logger.warn('Gemini API not configured, using fallback script');
       const fallbackScript = this.createFallbackScript(prompt);
-      this.filesystemService.saveToDebug(`${jobId}_script.json`, fallbackScript);
+      this.filesystemService.saveToDebug(
+        `${jobId}_script.json`,
+        fallbackScript,
+      );
       return fallbackScript;
     }
 

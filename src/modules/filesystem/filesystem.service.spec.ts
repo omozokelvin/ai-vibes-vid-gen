@@ -27,7 +27,7 @@ describe('FilesystemService', () => {
     }).compile();
 
     service = module.get<FilesystemService>(FilesystemService);
-    
+
     // Manually trigger onModuleInit to ensure directories are created
     await service.onModuleInit();
   });
@@ -140,7 +140,7 @@ describe('FilesystemService', () => {
   describe('Cleanup Temp', () => {
     it('should cleanup temp files matching job ID pattern', () => {
       const jobId = 'test_job_123';
-      
+
       // Create multiple files
       service.saveToTemp(`${jobId}_file1.txt`, 'content1');
       service.saveToTemp(`${jobId}_file2.txt`, 'content2');
@@ -163,7 +163,7 @@ describe('FilesystemService', () => {
 
     it('should handle cleanup when no matching files exist', () => {
       const jobId = 'nonexistent_job';
-      
+
       // Should not throw error
       expect(() => service.cleanupTemp(jobId)).not.toThrow();
     });

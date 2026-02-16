@@ -139,7 +139,7 @@ describe('AppController (e2e)', () => {
   });
 
   describe('GET /video/jobs', () => {
-    let createdJobIds: string[] = [];
+    const createdJobIds: string[] = [];
 
     beforeAll(async () => {
       // Create a few test jobs and store their IDs
@@ -173,17 +173,17 @@ describe('AppController (e2e)', () => {
       expect(response.body).toHaveProperty('completed');
       expect(response.body).toHaveProperty('failed');
       expect(response.body).toHaveProperty('jobs');
-      
+
       expect(typeof response.body.waiting).toBe('number');
       expect(typeof response.body.active).toBe('number');
       expect(typeof response.body.completed).toBe('number');
       expect(typeof response.body.failed).toBe('number');
-      
+
       expect(response.body.jobs).toHaveProperty('waiting');
       expect(response.body.jobs).toHaveProperty('active');
       expect(response.body.jobs).toHaveProperty('completed');
       expect(response.body.jobs).toHaveProperty('failed');
-      
+
       expect(Array.isArray(response.body.jobs.waiting)).toBe(true);
       expect(Array.isArray(response.body.jobs.active)).toBe(true);
       expect(Array.isArray(response.body.jobs.completed)).toBe(true);
@@ -192,12 +192,10 @@ describe('AppController (e2e)', () => {
 
     it('should have jobs tracked after creation', async () => {
       // Create a new job right before checking
-      await request(app.getHttpServer())
-        .post('/video/generate')
-        .send({
-          prompt: 'immediate test job',
-          uploadToYoutube: false,
-        });
+      await request(app.getHttpServer()).post('/video/generate').send({
+        prompt: 'immediate test job',
+        uploadToYoutube: false,
+      });
 
       // Immediately check jobs - should still be in queue
       const response = await request(app.getHttpServer())
@@ -205,12 +203,12 @@ describe('AppController (e2e)', () => {
         .expect(200);
 
       // Check that the structure is valid and contains our jobs
-      const totalJobs = 
-        response.body.waiting + 
-        response.body.active + 
-        response.body.completed + 
+      const totalJobs =
+        response.body.waiting +
+        response.body.active +
+        response.body.completed +
         response.body.failed;
-      
+
       // With a fresh job, we should have at least 1
       expect(totalJobs).toBeGreaterThan(0);
     });

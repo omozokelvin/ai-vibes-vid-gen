@@ -81,11 +81,13 @@ export class AppController {
   @Get('status/:jobId')
   @ApiOperation({
     summary: 'Get the status of a video generation job',
-    description: 'Retrieves the current status, progress, and result (if completed) of a video generation job.',
+    description:
+      'Retrieves the current status, progress, and result (if completed) of a video generation job.',
   })
   @ApiParam({
     name: 'jobId',
-    description: 'The queue job ID returned when the video generation job was created',
+    description:
+      'The queue job ID returned when the video generation job was created',
     example: '1',
   })
   @ApiResponse({
@@ -106,7 +108,10 @@ export class AppController {
           properties: {
             success: { type: 'boolean', example: true },
             jobId: { type: 'string', example: 'job_1234567890_abc123' },
-            finalVideoPath: { type: 'string', example: './temp/job_1234567890_abc123_output.mp4' },
+            finalVideoPath: {
+              type: 'string',
+              example: './temp/job_1234567890_abc123_output.mp4',
+            },
             uploadUrls: { type: 'object' },
             scriptData: { type: 'object' },
           },

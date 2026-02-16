@@ -43,7 +43,8 @@ export class GenerateVideoDto {
   description?: string;
 
   @ApiPropertyOptional({
-    description: 'Comma-separated tags for the video (used for social media uploads)',
+    description:
+      'Comma-separated tags for the video (used for social media uploads)',
     example: 'history,ships,battleships',
   })
   @IsOptional()
