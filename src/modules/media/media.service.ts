@@ -2,16 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import {
   VisualPrompt,
   ScriptData,
   MediaFiles,
 } from '../../common/interfaces/video-generation.interface';
 import { FilesystemService } from '../filesystem/filesystem.service';
-
-const execAsync = promisify(exec);
 
 @Injectable()
 export class MediaService {
@@ -62,11 +59,8 @@ export class MediaService {
     const outputPath = this.filesystemService.getTempPath(audioFileName);
 
     try {
-      // Use edge-tts command line tool
-      // edge-tts --text "Your text" --write-media output.mp3
-      const command = `edge-tts --text "${script.replace(/"/g, '\\"')}" --write-media "${outputPath}"`;
-
-      await execAsync(command);
+      // Use edge-tts command line tool with spawn for security
+      await this.runEdgeTts(script, outputPath);
 
       this.logger.log(`Audio generated: ${outputPath}`);
 
@@ -84,21 +78,73 @@ export class MediaService {
     }
   }
 
+  private runEdgeTts(text: string, outputPath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const args = ['--text', text, '--write-media', outputPath];
+      const edgeTts = spawn('edge-tts', args);
+
+      let stderr = '';
+
+      edgeTts.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      edgeTts.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`edge-tts failed with code ${code}: ${stderr}`));
+        }
+      });
+
+      edgeTts.on('error', (error) => {
+        reject(error);
+      });
+    });
+  }
+
   private async createSilentAudio(jobId: string): Promise<string> {
     const audioFileName = `${jobId}_audio.mp3`;
     const outputPath = this.filesystemService.getTempPath(audioFileName);
 
-    // Create 30 seconds of silence
-    const command = `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 30 -q:a 9 -acodec libmp3lame "${outputPath}"`;
+    // Create 30 seconds of silence using spawn
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-f',
+        'lavfi',
+        '-i',
+        'anullsrc=r=44100:cl=mono',
+        '-t',
+        '30',
+        '-q:a',
+        '9',
+        '-acodec',
+        'libmp3lame',
+        outputPath,
+      ];
 
-    try {
-      await execAsync(command);
-      this.logger.log(`Created silent audio: ${outputPath}`);
-      return outputPath;
-    } catch (error) {
-      this.logger.error(`Error creating silent audio: ${error.message}`);
-      throw error;
-    }
+      const ffmpeg = spawn('ffmpeg', args);
+
+      let stderr = '';
+
+      ffmpeg.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          this.logger.log(`Created silent audio: ${outputPath}`);
+          resolve(outputPath);
+        } else {
+          reject(new Error(`ffmpeg failed with code ${code}: ${stderr}`));
+        }
+      });
+
+      ffmpeg.on('error', (error) => {
+        this.logger.error(`Error creating silent audio: ${error.message}`);
+        reject(error);
+      });
+    });
   }
 
   private async generateVideos(
@@ -186,18 +232,46 @@ export class MediaService {
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
     const duration = prompt.duration || 5;
+    const text = prompt.prompt.substring(0, 50).replace(/[:\\]/g, '\\$&');
 
-    // Create a simple color video with text overlay
-    const command = `ffmpeg -f lavfi -i color=c=blue:s=1280x720:d=${duration} -vf "drawtext=text='${prompt.prompt.substring(0, 50).replace(/'/g, "\\'")}':fontsize=24:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2" -c:v libx264 -pix_fmt yuv420p "${outputPath}"`;
+    // Create a simple color video with text overlay using spawn
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-f',
+        'lavfi',
+        '-i',
+        `color=c=blue:s=1280x720:d=${duration}`,
+        '-vf',
+        `drawtext=text='${text}':fontsize=24:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`,
+        '-c:v',
+        'libx264',
+        '-pix_fmt',
+        'yuv420p',
+        outputPath,
+      ];
 
-    try {
-      await execAsync(command);
-      this.logger.log(`Created placeholder video: ${outputPath}`);
-      return outputPath;
-    } catch (error) {
-      this.logger.error(`Error creating placeholder video: ${error.message}`);
-      throw error;
-    }
+      const ffmpeg = spawn('ffmpeg', args);
+
+      let stderr = '';
+
+      ffmpeg.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          this.logger.log(`Created placeholder video: ${outputPath}`);
+          resolve(outputPath);
+        } else {
+          reject(new Error(`ffmpeg failed with code ${code}: ${stderr}`));
+        }
+      });
+
+      ffmpeg.on('error', (error) => {
+        this.logger.error(`Error creating placeholder video: ${error.message}`);
+        reject(error);
+      });
+    });
   }
 
   private async generateSubtitles(

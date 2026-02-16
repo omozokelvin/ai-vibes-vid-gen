@@ -16,7 +16,7 @@ export class AppController {
   @Post('generate')
   async generateVideo(@Body() generateVideoDto: GenerateVideoDto) {
     // Generate unique job ID
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     const jobData: VideoGenerationJobData = {
       jobId,

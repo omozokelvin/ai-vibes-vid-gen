@@ -22,9 +22,9 @@ describe('ScriptService', () => {
   it('should generate fallback script when API fails', async () => {
     const jobId = 'test_job_' + Date.now();
     const prompt = 'test battleships';
-    
+
     const script = await service.generateScript(prompt, jobId);
-    
+
     expect(script).toBeDefined();
     expect(script.script).toBeDefined();
     expect(script.visual_prompts).toBeDefined();

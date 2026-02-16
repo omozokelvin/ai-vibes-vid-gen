@@ -198,6 +198,11 @@ export class EditorService {
     return new Promise((resolve, reject) => {
       this.logger.log('Adding audio and burning subtitles');
 
+      // Escape subtitle path for FFmpeg filter - replace backslashes and colons
+      const escapedSubtitlePath = subtitlePath
+        .replace(/\\/g, '/')
+        .replace(/:/g, '\\:');
+
       Ffmpeg(videoPath)
         .input(audioPath)
         .outputOptions([
@@ -206,7 +211,7 @@ export class EditorService {
           '-map 0:v:0',
           '-map 1:a:0',
           '-shortest',
-          `-vf subtitles=${subtitlePath}`,
+          `-vf subtitles='${escapedSubtitlePath}'`,
         ])
         .output(outputPath)
         .on('start', (commandLine) => {
