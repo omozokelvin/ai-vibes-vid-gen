@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { ScriptService } from '../src/modules/script/script.service';
-import { FilesystemModule } from '../src/modules/filesystem/filesystem.module';
+import { FilesystemService } from '../src/modules/filesystem/filesystem.service';
 
 describe('ScriptService', () => {
   let service: ScriptService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot(), FilesystemModule],
-      providers: [ScriptService],
+      imports: [ConfigModule.forRoot()],
+      providers: [ScriptService, FilesystemService],
     }).compile();
 
     service = module.get<ScriptService>(ScriptService);
