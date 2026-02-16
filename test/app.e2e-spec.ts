@@ -178,22 +178,30 @@ describe('AppController (e2e)', () => {
       expect(Array.isArray(response.body.jobs.failed)).toBe(true);
     });
 
-    it('should return proper job structure', async () => {
+    it('should track created jobs in some state', async () => {
       const response = await request(app.getHttpServer())
         .get('/video/jobs')
         .expect(200);
 
-      // Just verify the structure is correct
-      // Jobs may be completed or failed by the time we check
+      // Verify that jobs are being tracked in at least one state
+      // Jobs may be in waiting, active, completed, or failed state
       const totalJobs = 
         response.body.waiting + 
         response.body.active + 
         response.body.completed + 
         response.body.failed;
       
-      // We created jobs earlier, so there should be at least something tracked
-      // But we won't enforce this since jobs could complete quickly
-      expect(totalJobs).toBeGreaterThanOrEqual(0);
+      // We created jobs in beforeAll, so there should be tracked jobs
+      expect(totalJobs).toBeGreaterThan(0);
+      
+      // Verify at least one job array has entries
+      const hasJobsInSomeState = 
+        response.body.jobs.waiting.length > 0 ||
+        response.body.jobs.active.length > 0 ||
+        response.body.jobs.completed.length > 0 ||
+        response.body.jobs.failed.length > 0;
+      
+      expect(hasJobsInSomeState).toBe(true);
     });
   });
 });
