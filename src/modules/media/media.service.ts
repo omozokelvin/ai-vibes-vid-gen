@@ -24,7 +24,7 @@ export class MediaService {
     this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
     this.hfModelId =
       this.configService.get<string>('HUGGINGFACE_VIDEO_MODEL') ||
-      'damo-vilab/text-to-video-ms-1.7b';
+      'ali-vilab/modelscope-damo-text-to-video-hd';
     this.hfInferenceUrl =
       this.configService.get<string>('HUGGINGFACE_INFERENCE_URL') ||
       `https://api-inference.huggingface.co/models/${this.hfModelId}`;
