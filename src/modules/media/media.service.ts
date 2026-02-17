@@ -345,6 +345,7 @@ export class MediaService {
           headers: {
             'Content-Type': 'application/json',
             apikey: '0000000000', // Anonymous API key
+            'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs', // Required by Stable Horde
           },
           timeout: 15000,
         },
@@ -366,7 +367,12 @@ export class MediaService {
 
         const statusResponse = await axios.get(
           `https://stablehorde.net/api/v2/generate/check/${requestId}`,
-          { timeout: 10000 },
+          {
+            headers: {
+              'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs',
+            },
+            timeout: 10000,
+          },
         );
 
         const status = statusResponse.data;
@@ -377,7 +383,12 @@ export class MediaService {
           // Step 3: Get the generated image
           const resultResponse = await axios.get(
             `https://stablehorde.net/api/v2/generate/status/${requestId}`,
-            { timeout: 10000 },
+            {
+              headers: {
+                'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs',
+              },
+              timeout: 10000,
+            },
           );
 
           const imageUrl = resultResponse.data.generations[0]?.img;
