@@ -5,6 +5,7 @@ This guide provides instructions for deploying the AI Vibes Video Generation sys
 ## Prerequisites
 
 ### System Requirements
+
 - Node.js v18 or higher
 - Redis server v6 or higher
 - FFMPEG with libx264, libmp3lame, and aac support
@@ -13,9 +14,9 @@ This guide provides instructions for deploying the AI Vibes Video Generation sys
 - Minimum 10GB free disk space
 
 ### API Keys Required
+
 1. **Google Gemini API Key** (Free tier)
    - Get from: https://makersuite.google.com/app/apikey
-   
 2. **Hugging Face API Token** (Free tier)
    - Get from: https://huggingface.co/settings/tokens
 
@@ -27,6 +28,7 @@ This guide provides instructions for deploying the AI Vibes Video Generation sys
 ### 1. Install System Dependencies
 
 #### Ubuntu/Debian
+
 ```bash
 # Update package list
 sudo apt-get update
@@ -47,6 +49,7 @@ sudo systemctl start redis-server
 ```
 
 #### macOS
+
 ```bash
 # Install Homebrew if not already installed
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -90,6 +93,7 @@ nano .env  # or use your preferred editor
 ```
 
 Required environment variables:
+
 ```env
 # Application
 PORT=3000
@@ -154,6 +158,7 @@ pm2 logs ai-vibes-vid-gen
 ### Option 2: Docker Deployment
 
 Create a `Dockerfile`:
+
 ```dockerfile
 FROM node:18-alpine
 
@@ -185,6 +190,7 @@ CMD ["node", "dist/main.js"]
 ```
 
 Create `docker-compose.yml`:
+
 ```yaml
 version: '3.8'
 
@@ -192,14 +198,14 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis-data:/data
 
   app:
     build: .
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - NODE_ENV=production
       - REDIS_HOST=redis
@@ -217,6 +223,7 @@ volumes:
 ```
 
 Deploy with Docker:
+
 ```bash
 # Build and start
 docker-compose up -d
@@ -231,6 +238,7 @@ docker-compose down
 ### Option 3: Systemd Service
 
 Create `/etc/systemd/system/ai-vibes-vid-gen.service`:
+
 ```ini
 [Unit]
 Description=AI Vibes Video Generation Service
@@ -249,6 +257,7 @@ WantedBy=multi-user.target
 ```
 
 Enable and start:
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable ai-vibes-vid-gen
@@ -259,6 +268,7 @@ sudo systemctl status ai-vibes-vid-gen
 ## Reverse Proxy Setup (Nginx)
 
 Create `/etc/nginx/sites-available/ai-vibes-vid-gen`:
+
 ```nginx
 server {
     listen 80;
@@ -273,7 +283,7 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        
+
         # Increase timeout for long video generation
         proxy_read_timeout 300s;
         proxy_connect_timeout 300s;
@@ -282,6 +292,7 @@ server {
 ```
 
 Enable the site:
+
 ```bash
 sudo ln -s /etc/nginx/sites-available/ai-vibes-vid-gen /etc/nginx/sites-enabled/
 sudo nginx -t
@@ -305,6 +316,7 @@ sudo certbot --nginx -d your-domain.com
 ### Health Checks
 
 Create a monitoring script:
+
 ```bash
 #!/bin/bash
 # health-check.sh
@@ -323,11 +335,13 @@ fi
 ### Log Rotation
 
 Configure logrotate for PM2:
+
 ```bash
 sudo nano /etc/logrotate.d/ai-vibes-vid-gen
 ```
 
 Content:
+
 ```
 /home/user/.pm2/logs/*.log {
     daily
@@ -342,6 +356,7 @@ Content:
 ### Cleanup Script
 
 Create a cleanup cron job to remove old temp files:
+
 ```bash
 # Edit crontab
 crontab -e
@@ -400,6 +415,7 @@ tar -czf ai-vibes-backup-$(date +%Y%m%d).tar.gz \
 ## Troubleshooting
 
 ### Application won't start
+
 ```bash
 # Check logs
 pm2 logs ai-vibes-vid-gen --lines 100
@@ -409,6 +425,7 @@ sudo journalctl -u ai-vibes-vid-gen -n 100
 ```
 
 ### Redis connection issues
+
 ```bash
 # Check Redis status
 sudo systemctl status redis
@@ -419,6 +436,7 @@ redis-cli CONFIG GET bind
 ```
 
 ### FFMPEG errors
+
 ```bash
 # Verify FFMPEG installation
 ffmpeg -version
@@ -427,6 +445,7 @@ ffmpeg -codecs | grep aac
 ```
 
 ### Out of disk space
+
 ```bash
 # Check disk usage
 df -h
@@ -439,6 +458,7 @@ find ./debug -type f -mtime +7 -delete
 ## Security Hardening
 
 1. **Firewall Configuration**
+
 ```bash
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
@@ -447,6 +467,7 @@ sudo ufw enable
 ```
 
 2. **Rate Limiting** (in Nginx)
+
 ```nginx
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/m;
 
@@ -457,6 +478,7 @@ location /video/generate {
 ```
 
 3. **Environment Security**
+
 ```bash
 # Restrict .env permissions
 chmod 600 .env
@@ -466,12 +488,14 @@ chown www-data:www-data .env
 ## Performance Optimization
 
 1. **Node.js Memory**
+
 ```bash
 # Increase Node.js memory limit
 NODE_OPTIONS="--max-old-space-size=4096" node dist/main.js
 ```
 
 2. **Redis Optimization**
+
 ```bash
 # Edit Redis config
 sudo nano /etc/redis/redis.conf
@@ -482,6 +506,7 @@ maxmemory-policy allkeys-lru
 ```
 
 3. **FFMPEG Hardware Acceleration** (if available)
+
 ```typescript
 // In editor.service.ts
 .outputOptions([
@@ -494,6 +519,7 @@ maxmemory-policy allkeys-lru
 ## Support and Updates
 
 ### Updating the Application
+
 ```bash
 # Pull latest changes
 git pull origin main
@@ -512,6 +538,7 @@ sudo systemctl restart ai-vibes-vid-gen
 ```
 
 ### Monitoring Resources
+
 - Check application health: `http://your-domain.com/video`
 - Monitor queue: `http://your-domain.com/video/jobs`
 - PM2 dashboard: `pm2 web` (accessible at http://localhost:9615)
@@ -535,6 +562,7 @@ sudo systemctl restart ai-vibes-vid-gen
 ## Contact and Support
 
 For issues and questions:
+
 - Create an issue on GitHub
 - Check the documentation in README.md and USAGE.md
 - Review logs for error details
