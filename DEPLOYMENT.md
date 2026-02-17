@@ -104,6 +104,16 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 # Hugging Face API
 HUGGINGFACE_API_KEY=your_actual_api_key_here
+# Video generation provider: "space" (free) or "inference"
+HUGGINGFACE_VIDEO_PROVIDER=space
+
+# Hugging Face Space (default: genmo/mochi-1-preview)
+HUGGINGFACE_SPACE_NAME=genmo/mochi-1-preview
+HUGGINGFACE_SPACE_ENDPOINT=/predict
+# Optional: JSON array of inputs for the Space; use {{prompt}} as a placeholder
+# HUGGINGFACE_SPACE_INPUTS=["{{prompt}}"]
+
+# Inference API (legacy)
 HUGGINGFACE_VIDEO_MODEL=damo-vilab/text-to-video-ms-1.7b
 # Optional: override full inference URL (useful for private endpoints)
 # HUGGINGFACE_INFERENCE_URL=https://api-inference.huggingface.co/models/your-model

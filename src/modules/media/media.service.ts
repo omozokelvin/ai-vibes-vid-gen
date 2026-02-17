@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
+import * as path from 'path';
+import { pathToFileURL } from 'url';
 import {
   VisualPrompt,
   ScriptData,
@@ -16,6 +18,10 @@ export class MediaService {
   private hfApiKey: string;
   private hfInferenceUrl: string;
   private hfModelId: string;
+  private hfVideoProvider: 'space' | 'inference';
+  private hfSpaceName: string;
+  private hfSpaceEndpoint: string;
+  private hfSpaceInputs: string;
 
   constructor(
     private configService: ConfigService,
@@ -24,7 +30,21 @@ export class MediaService {
     this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
     this.hfModelId =
       this.configService.get<string>('HUGGINGFACE_VIDEO_MODEL') ||
-      'ali-vilab/modelscope-damo-text-to-video-hd';
+      'damo-vilab/text-to-video-ms-1.7b';
+    this.hfVideoProvider =
+      (
+        this.configService.get<string>('HUGGINGFACE_VIDEO_PROVIDER') || 'space'
+      ).toLowerCase() === 'inference'
+        ? 'inference'
+        : 'space';
+    this.hfSpaceName =
+      this.configService.get<string>('HUGGINGFACE_SPACE_NAME') ||
+      'genmo/mochi-1-preview';
+    this.hfSpaceEndpoint =
+      this.configService.get<string>('HUGGINGFACE_SPACE_ENDPOINT') ||
+      '/predict';
+    this.hfSpaceInputs =
+      this.configService.get<string>('HUGGINGFACE_SPACE_INPUTS') || '';
     this.hfInferenceUrl =
       this.configService.get<string>('HUGGINGFACE_INFERENCE_URL') ||
       `https://api-inference.huggingface.co/models/${this.hfModelId}`;
@@ -192,6 +212,18 @@ export class MediaService {
     const videoFileName = `${jobId}_clip_${prompt.index}.mp4`;
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
+    if (this.hfVideoProvider === 'space') {
+      return this.generateSingleVideoViaSpace(prompt, jobId, outputPath);
+    }
+
+    return this.generateSingleVideoViaInference(prompt, jobId, outputPath);
+  }
+
+  private async generateSingleVideoViaInference(
+    prompt: VisualPrompt,
+    jobId: string,
+    outputPath: string,
+  ): Promise<string> {
     if (!this.hfApiKey) {
       this.logger.warn(
         'Hugging Face API key not configured, using placeholder',
@@ -200,7 +232,6 @@ export class MediaService {
     }
 
     try {
-      // Use Hugging Face Inference API for text-to-video
       const response = await axios.post(
         this.hfInferenceUrl,
         {
@@ -219,7 +250,6 @@ export class MediaService {
       fs.writeFileSync(outputPath, response.data);
       this.logger.log(`Video generated: ${outputPath}`);
 
-      // Save to debug
       this.filesystemService.saveToDebug(
         `${jobId}_clip_${prompt.index}.mp4`,
         response.data,
@@ -237,6 +267,158 @@ export class MediaService {
       }
       return this.createPlaceholderVideo(prompt, jobId);
     }
+  }
+
+  private async generateSingleVideoViaSpace(
+    prompt: VisualPrompt,
+    jobId: string,
+    outputPath: string,
+  ): Promise<string> {
+    if (!this.hfSpaceName) {
+      this.logger.warn('Hugging Face Space not configured, using placeholder');
+      return this.createPlaceholderVideo(prompt, jobId);
+    }
+
+    try {
+      const gradioClient = await this.loadGradioClient();
+      const app = await gradioClient(this.hfSpaceName, {
+        hf_token: this.getHfToken(),
+      });
+      const inputs = this.getSpaceInputs(prompt.prompt);
+      const result = await app.predict(this.hfSpaceEndpoint, inputs);
+      const source = this.extractVideoSource(result);
+
+      if (!source) {
+        throw new Error('No video output found in Space response');
+      }
+
+      await this.saveVideoFromSource(source, outputPath);
+      this.logger.log(`Video generated: ${outputPath}`);
+      this.filesystemService.saveToDebug(
+        `${jobId}_clip_${prompt.index}.mp4`,
+        fs.readFileSync(outputPath),
+      );
+
+      return outputPath;
+    } catch (error) {
+      this.logger.error(`Hugging Face Space error: ${error.message}`);
+      return this.createPlaceholderVideo(prompt, jobId);
+    }
+  }
+
+  private getSpaceInputs(prompt: string): unknown[] {
+    if (!this.hfSpaceInputs) {
+      return [prompt];
+    }
+
+    try {
+      const parsed = JSON.parse(this.hfSpaceInputs);
+      if (!Array.isArray(parsed)) {
+        this.logger.warn(
+          'HUGGINGFACE_SPACE_INPUTS is not an array, falling back to [prompt]',
+        );
+        return [prompt];
+      }
+
+      return parsed.map((value) =>
+        typeof value === 'string'
+          ? value.replace(/\{\{prompt\}\}/g, prompt)
+          : value,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to parse HUGGINGFACE_SPACE_INPUTS: ${error.message}`,
+      );
+      return [prompt];
+    }
+  }
+
+  private async loadGradioClient(): Promise<
+    (
+      space: string,
+      options?: { hf_token?: `hf_${string}` },
+    ) => Promise<{
+      predict: (endpoint: string, inputs: unknown[]) => Promise<unknown>;
+    }>
+  > {
+    const modulePath = path.join(
+      process.cwd(),
+      'node_modules',
+      '@gradio',
+      'client',
+      'dist',
+      'index.js',
+    );
+    const mod = await import(pathToFileURL(modulePath).href);
+    return mod.client as typeof mod.client;
+  }
+
+  private getHfToken(): `hf_${string}` | undefined {
+    if (!this.hfApiKey) {
+      return undefined;
+    }
+
+    return this.hfApiKey.startsWith('hf_')
+      ? (this.hfApiKey as `hf_${string}`)
+      : undefined;
+  }
+
+  private extractVideoSource(result: unknown): string | null {
+    const data = (result as { data?: unknown }).data ?? result;
+    const candidates = Array.isArray(data) ? data : [data];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        if (candidate.startsWith('http')) {
+          return candidate;
+        }
+        if (candidate.startsWith('data:video')) {
+          return candidate;
+        }
+      }
+
+      if (candidate && typeof candidate === 'object') {
+        const typed = candidate as {
+          url?: string;
+          path?: string;
+          file?: { url?: string; path?: string };
+        };
+
+        if (typed.url) {
+          return typed.url;
+        }
+
+        if (typed.path) {
+          return typed.path;
+        }
+
+        if (typed.file?.url) {
+          return typed.file.url;
+        }
+
+        if (typed.file?.path) {
+          return typed.file.path;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private async saveVideoFromSource(
+    source: string,
+    outputPath: string,
+  ): Promise<void> {
+    if (source.startsWith('data:')) {
+      const base64 = source.split(',')[1] || '';
+      fs.writeFileSync(outputPath, Buffer.from(base64, 'base64'));
+      return;
+    }
+
+    const response = await axios.get(source, {
+      responseType: 'arraybuffer',
+    });
+    fs.writeFileSync(outputPath, response.data);
   }
 
   private async createPlaceholderVideo(
