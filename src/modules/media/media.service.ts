@@ -14,12 +14,20 @@ import { FilesystemService } from '../filesystem/filesystem.service';
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
   private hfApiKey: string;
+  private hfInferenceUrl: string;
+  private hfModelId: string;
 
   constructor(
     private configService: ConfigService,
     private filesystemService: FilesystemService,
   ) {
     this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
+    this.hfModelId =
+      this.configService.get<string>('HUGGINGFACE_VIDEO_MODEL') ||
+      'damo-vilab/text-to-video-ms-1.7b';
+    this.hfInferenceUrl =
+      this.configService.get<string>('HUGGINGFACE_INFERENCE_URL') ||
+      `https://api-inference.huggingface.co/models/${this.hfModelId}`;
   }
 
   async generateMedia(
@@ -193,15 +201,15 @@ export class MediaService {
 
     try {
       // Use Hugging Face Inference API for text-to-video
-      // Model: damo-vilab/text-to-video-ms-1.7b
       const response = await axios.post(
-        'https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b',
+        this.hfInferenceUrl,
         {
           inputs: prompt.prompt,
         },
         {
           headers: {
             Authorization: `Bearer ${this.hfApiKey}`,
+            Accept: 'video/mp4',
           },
           responseType: 'arraybuffer',
           timeout: 120000, // 2 minutes timeout
@@ -219,7 +227,14 @@ export class MediaService {
 
       return outputPath;
     } catch (error) {
-      this.logger.error(`Hugging Face API error: ${error.message}`);
+      const status = error?.response?.status;
+      if (status === 410) {
+        this.logger.error(
+          `Hugging Face model is no longer available (410). Update HUGGINGFACE_VIDEO_MODEL or HUGGINGFACE_INFERENCE_URL. Current model: ${this.hfModelId}`,
+        );
+      } else {
+        this.logger.error(`Hugging Face API error: ${error.message}`);
+      }
       return this.createPlaceholderVideo(prompt, jobId);
     }
   }

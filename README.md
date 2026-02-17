@@ -47,23 +47,27 @@ pip install edge-tts
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/omozokelvin/ai-vibes-vid-gen.git
 cd ai-vibes-vid-gen
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Configure environment variables:
+
 ```bash
 cp .env.example .env
 # Edit .env and add your API keys
 ```
 
 4. Start Redis (required for BullMQ):
+
 ```bash
 # Using Docker
 docker run -d -p 6379:6379 redis
@@ -89,6 +93,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 # Hugging Face API (Free Tier)
 # Get your key from: https://huggingface.co/settings/tokens
 HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+HUGGINGFACE_VIDEO_MODEL=damo-vilab/text-to-video-ms-1.7b
+# Optional: override full inference URL (useful for private endpoints)
+# HUGGINGFACE_INFERENCE_URL=https://api-inference.huggingface.co/models/your-model
 
 # YouTube API (Optional - for uploads)
 # Setup: https://console.cloud.google.com/
@@ -114,11 +121,13 @@ DEBUG_DIR=./debug
 ## Running the Application
 
 ### Development Mode
+
 ```bash
 npm run start:dev
 ```
 
 ### Production Mode
+
 ```bash
 npm run build
 npm run start:prod
@@ -129,6 +138,7 @@ The API will be available at `http://localhost:3000`
 ## API Endpoints
 
 ### Generate Video
+
 ```bash
 POST /video/generate
 Content-Type: application/json
@@ -144,6 +154,7 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 {
   "message": "Video generation job started",
@@ -154,11 +165,13 @@ Response:
 ```
 
 ### Check Job Status
+
 ```bash
 GET /video/status/:queueJobId
 ```
 
 Response:
+
 ```json
 {
   "jobId": "1",
@@ -175,6 +188,7 @@ Response:
 ```
 
 ### List All Jobs
+
 ```bash
 GET /video/jobs
 ```
@@ -249,21 +263,25 @@ This system uses **100% free APIs and tools**:
 ## Troubleshooting
 
 ### Videos Not Generating
+
 - Check that Hugging Face API key is valid
 - The free tier may have rate limits - wait and retry
 - Check `./debug` folder for intermediate files
 
 ### Audio Not Working
+
 - Ensure edge-tts is installed: `pip install edge-tts`
 - Check that edge-tts is in your PATH
 - Test manually: `edge-tts --text "Hello" --write-media test.mp3`
 
 ### FFMPEG Errors
+
 - Ensure FFMPEG is installed with required codecs
 - Test: `ffmpeg -version`
 - Check logs for specific error messages
 
 ### Redis Connection Issues
+
 - Ensure Redis is running: `redis-cli ping` (should return PONG)
 - Check REDIS_HOST and REDIS_PORT in .env
 
@@ -274,26 +292,31 @@ This system uses **100% free APIs and tools**:
 The project includes both unit tests and integration tests.
 
 #### Run All Tests
+
 ```bash
 npm run test
 ```
 
 #### Run Integration/E2E Tests
+
 ```bash
 npm run test:e2e
 ```
 
 **Note:** Integration tests require Redis to be running. You can start Redis using Docker:
+
 ```bash
 docker run -d -p 6379:6379 --name redis-test redis:alpine
 ```
 
 #### Run Tests with Coverage
+
 ```bash
 npm run test:cov
 ```
 
 #### Run Tests in Watch Mode
+
 ```bash
 npm run test:watch
 ```
@@ -303,8 +326,7 @@ npm run test:watch
 - **Unit Tests**: Located in `test/` directory
   - `filesystem.spec.ts`: Tests for filesystem service
   - `script.spec.ts`: Tests for script generation service
-  
-- **Integration Tests**: 
+- **Integration Tests**:
   - `app.e2e-spec.ts`: End-to-end tests for API endpoints
     - Tests video generation endpoint
     - Tests job status checking
@@ -312,11 +334,13 @@ npm run test:watch
     - Tests input validation
 
 ### Linting
+
 ```bash
 npm run lint
 ```
 
 ### Format Code
+
 ```bash
 npm run format
 ```

@@ -100,6 +100,9 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 # Hugging Face API
 HUGGINGFACE_API_KEY=your_actual_api_key_here
+HUGGINGFACE_VIDEO_MODEL=damo-vilab/text-to-video-ms-1.7b
+# Optional: override full inference URL (useful for private endpoints)
+# HUGGINGFACE_INFERENCE_URL=https://api-inference.huggingface.co/models/your-model
 
 # Redis
 REDIS_HOST=localhost
