@@ -3,8 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import * as path from 'path';
-import { pathToFileURL } from 'url';
 import {
   VisualPrompt,
   ScriptData,
@@ -341,15 +339,8 @@ export class MediaService {
       predict: (endpoint: string, inputs: unknown[]) => Promise<unknown>;
     }>
   > {
-    const modulePath = path.join(
-      process.cwd(),
-      'node_modules',
-      '@gradio',
-      'client',
-      'dist',
-      'index.js',
-    );
-    const mod = await import(pathToFileURL(modulePath).href);
+    // Dynamic import for ESM module
+    const mod = await import('@gradio/client');
     return mod.client as typeof mod.client;
   }
 
