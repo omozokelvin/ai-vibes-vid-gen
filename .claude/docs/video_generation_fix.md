@@ -1,15 +1,18 @@
 # Video Generation Fix - ESM to Image-to-Video Approach
 
 ## Problem
+
 The original implementation used `@gradio/client` (ESM-only package) which had compatibility issues with NestJS's CommonJS compilation, causing "Cannot find module" errors.
 
 ## Solution
+
 Completely removed `@gradio/client` dependency and implemented a more reliable approach:
 
 ### New Approach: Text-to-Image → Video Conversion
 
 **Instead of:** Text-to-Video models (unreliable, often unavailable)
 **Now uses:**
+
 1. **Text-to-Image** via Hugging Face Inference API (Stable Diffusion)
 2. **Image-to-Video** conversion with FFmpeg zoom/pan effects
 
@@ -37,6 +40,7 @@ Completely removed `@gradio/client` dependency and implemented a more reliable a
 ## Technical Changes
 
 ### Removed
+
 - `@gradio/client` package dependency
 - All Gradio-related code (`loadGradioClient`, `getSpaceInputs`, etc.)
 - Hugging Face Spaces configuration
@@ -44,6 +48,7 @@ Completely removed `@gradio/client` dependency and implemented a more reliable a
 - ESM dynamic import logic
 
 ### Added
+
 - `generateVideoFromImage()` - Generates image via Hugging Face, converts to video
 - `convertImageToVideo()` - FFmpeg zoom/pan effect (Ken Burns style)
 - Simplified error handling with better logging
@@ -51,11 +56,13 @@ Completely removed `@gradio/client` dependency and implemented a more reliable a
 ### Updated Environment Variables
 
 **New:**
+
 ```bash
 HUGGINGFACE_IMAGE_MODEL=stabilityai/stable-diffusion-2-1
 ```
 
 **Removed (no longer needed):**
+
 - `HUGGINGFACE_VIDEO_PROVIDER`
 - `HUGGINGFACE_SPACE_NAME`
 - `HUGGINGFACE_SPACE_ENDPOINT`
@@ -65,6 +72,7 @@ HUGGINGFACE_IMAGE_MODEL=stabilityai/stable-diffusion-2-1
 ## Video Generation Flow
 
 ### Before
+
 ```
 Prompt → Hugging Face Space (via @gradio/client) → Video
             ↓ (often fails with ESM errors)
@@ -72,6 +80,7 @@ Prompt → Hugging Face Space (via @gradio/client) → Video
 ```
 
 ### After
+
 ```
 Prompt → Hugging Face Inference API → Image
             ↓
@@ -83,9 +92,11 @@ Prompt → Hugging Face Inference API → Image
 ## FFmpeg Zoom Effect
 
 The new implementation creates engaging videos with a slow zoom effect:
+
 ```
 zoompan=z='min(zoom+0.0015,1.5)':d=125:s=1280x720
 ```
+
 - Starts at normal zoom
 - Gradually zooms to 1.5x over the video duration
 - Creates a Ken Burns documentary-style effect
@@ -118,11 +129,13 @@ HUGGINGFACE_IMAGE_MODEL=stabilityai/stable-diffusion-2-1
 ## Testing
 
 Build succeeds:
+
 ```bash
 npm run build ✅
 ```
 
 No more errors:
+
 - ❌ "Cannot find module '@gradio/client'"
 - ❌ "No 'exports' main defined"
 - ✅ Clean build with no ESM issues
@@ -136,6 +149,7 @@ No more errors:
 ## Migration Notes
 
 If you were using Hugging Face Spaces:
+
 1. Set `HUGGINGFACE_IMAGE_MODEL` instead of `HUGGINGFACE_VIDEO_MODEL`
 2. Remove Space-related environment variables
 3. Your `HUGGINGFACE_API_KEY` still works the same way
@@ -144,6 +158,7 @@ If you were using Hugging Face Spaces:
 ## Future Enhancements
 
 Possible improvements:
+
 - Add different pan/zoom patterns (left-to-right, zoom-out, etc.)
 - Support for multiple images per scene
 - Crossfade transitions between clips

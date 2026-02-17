@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
+import Replicate from 'replicate';
 import {
   VisualPrompt,
   ScriptData,
@@ -15,17 +16,40 @@ export class MediaService {
   private readonly logger = new Logger(MediaService.name);
   private hfApiKey: string;
   private hfModelId: string;
+  private replicate: Replicate | null = null;
+  private imageProvider: 'huggingface' | 'replicate' | 'stablehorde' | 'none';
+  private useFreeAI: boolean;
 
   constructor(
     private configService: ConfigService,
     private filesystemService: FilesystemService,
   ) {
     this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
-    // Use a reliable text-to-image model (Stable Diffusion) instead of text-to-video
-    // We'll convert images to videos with FFmpeg
     this.hfModelId =
       this.configService.get<string>('HUGGINGFACE_IMAGE_MODEL') ||
-      'stabilityai/stable-diffusion-2-1';
+      'runwayml/stable-diffusion-v1-5';
+
+    // Check for free AI preference
+    this.useFreeAI = this.configService.get<string>('USE_FREE_AI') === 'true';
+
+    // Priority: Free AI (Stable Horde) > Replicate > Hugging Face > None
+    const replicateApiKey = this.configService.get<string>('REPLICATE_API_TOKEN');
+
+    if (this.useFreeAI) {
+      this.imageProvider = 'stablehorde';
+      this.logger.log('Using Stable Horde (FREE, no API key) for image generation');
+      this.logger.warn('Note: Free generation may be slow (30-120s per image) depending on community availability');
+    } else if (replicateApiKey) {
+      this.replicate = new Replicate({ auth: replicateApiKey });
+      this.imageProvider = 'replicate';
+      this.logger.log('Using Replicate for image generation');
+    } else if (this.hfApiKey) {
+      this.imageProvider = 'huggingface';
+      this.logger.log('Using Hugging Face for image generation (may fail with 410)');
+    } else {
+      this.imageProvider = 'none';
+      this.logger.warn('No image generation API configured, using placeholders');
+    }
   }
 
   async generateMedia(
@@ -190,13 +214,17 @@ export class MediaService {
     const videoFileName = `${jobId}_clip_${prompt.index}.mp4`;
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
-    // Try to generate image with Hugging Face, then convert to video
-    if (this.hfApiKey) {
+    // Try image generation based on available provider
+    if (this.imageProvider === 'stablehorde') {
+      return this.generateVideoFromImageStableHorde(prompt, jobId, outputPath);
+    } else if (this.imageProvider === 'replicate') {
+      return this.generateVideoFromImageReplicate(prompt, jobId, outputPath);
+    } else if (this.imageProvider === 'huggingface') {
       return this.generateVideoFromImage(prompt, jobId, outputPath);
     }
 
     // Fallback to placeholder
-    this.logger.warn('No Hugging Face API key configured, using placeholder');
+    this.logger.warn('No image generation API configured, using placeholder');
     return this.createPlaceholderVideo(prompt, jobId);
   }
 
@@ -249,13 +277,189 @@ export class MediaService {
       const status = error?.response?.status;
       if (status === 503) {
         this.logger.warn(
-          `Model is loading (503). Using placeholder. Model: ${this.hfModelId}`,
+          `Model is loading (503). This usually takes 20-60 seconds. Retrying or using placeholder. Model: ${this.hfModelId}`,
         );
       } else if (status === 401) {
-        this.logger.error('Invalid Hugging Face API key');
+        this.logger.error('Invalid Hugging Face API key (401)');
+      } else if (status === 410) {
+        this.logger.error(
+          `Model endpoint no longer available (410): ${this.hfModelId}. ` +
+            `Try alternative models: runwayml/stable-diffusion-v1-5, prompthero/openjourney, ` +
+            `stabilityai/stable-diffusion-xl-base-1.0, or black-forest-labs/FLUX.1-schnell`,
+        );
       } else {
-        this.logger.error(`Hugging Face API error: ${error.message}`);
+        this.logger.error(
+          `Hugging Face API error (${status || 'unknown'}): ${error.message}`,
+        );
       }
+      return this.createPlaceholderVideo(prompt, jobId);
+    }
+  }
+
+  private async generateVideoFromImageStableHorde(
+    prompt: VisualPrompt,
+    jobId: string,
+    outputPath: string,
+  ): Promise<string> {
+    const imageFileName = `${jobId}_image_${prompt.index}.png`;
+    const imagePath = this.filesystemService.getTempPath(imageFileName);
+
+    try {
+      this.logger.log('Requesting image from Stable Horde (FREE, community-powered)...');
+
+      // Step 1: Submit generation request
+      const requestBody = {
+        prompt: prompt.prompt,
+        params: {
+          width: 1280,
+          height: 720,
+          steps: 25,
+          cfg_scale: 7,
+          sampler_name: 'k_euler_a',
+        },
+        nsfw: false,
+        censor_nsfw: true,
+        models: ['stable_diffusion'], // Use stable diffusion models
+      };
+
+      const submitResponse = await axios.post(
+        'https://stablehorde.net/api/v2/generate/async',
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Client-Agent': 'VideoGenerator:1.0:contact@example.com',
+          },
+          timeout: 10000,
+        },
+      );
+
+      const requestId = submitResponse.data.id;
+      this.logger.log(`Stable Horde request submitted: ${requestId}`);
+      this.logger.log('Waiting for community workers to generate image (this may take 30-120 seconds)...');
+
+      // Step 2: Poll for result
+      let attempts = 0;
+      const maxAttempts = 40; // 40 attempts * 3 seconds = 2 minutes max
+
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        attempts++;
+
+        const statusResponse = await axios.get(
+          `https://stablehorde.net/api/v2/generate/check/${requestId}`,
+          { timeout: 10000 }
+        );
+
+        const status = statusResponse.data;
+
+        if (status.done) {
+          this.logger.log('Image generation complete! Fetching result...');
+
+          // Step 3: Get the generated image
+          const resultResponse = await axios.get(
+            `https://stablehorde.net/api/v2/generate/status/${requestId}`,
+            { timeout: 10000 }
+          );
+
+          const imageUrl = resultResponse.data.generations[0]?.img;
+
+          if (!imageUrl) {
+            throw new Error('No image URL in response');
+          }
+
+          // Download the image
+          const imageResponse = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 30000,
+          });
+
+          fs.writeFileSync(imagePath, imageResponse.data);
+          this.logger.log(`Image generated via Stable Horde: ${imagePath}`);
+
+          // Convert to video
+          await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
+          this.logger.log(`Video created from image: ${outputPath}`);
+
+          // Save to debug
+          this.filesystemService.saveToDebug(
+            `${jobId}_clip_${prompt.index}.mp4`,
+            fs.readFileSync(outputPath),
+          );
+
+          return outputPath;
+        }
+
+        if (status.faulted) {
+          throw new Error('Generation faulted on Stable Horde');
+        }
+
+        // Log progress every 5 attempts
+        if (attempts % 5 === 0) {
+          this.logger.log(`Still waiting... (${attempts * 3}s elapsed, queue position: ${status.queue_position || 'unknown'})`);
+        }
+      }
+
+      throw new Error('Timeout waiting for Stable Horde generation');
+
+    } catch (error) {
+      this.logger.error(`Stable Horde error: ${error.message}`);
+      this.logger.warn('Falling back to placeholder video. For faster/reliable generation, consider Replicate API (~$0.003/image)');
+      return this.createPlaceholderVideo(prompt, jobId);
+    }
+  }
+
+  private async generateVideoFromImageReplicate(
+    prompt: VisualPrompt,
+    jobId: string,
+    outputPath: string,
+  ): Promise<string> {
+    const imageFileName = `${jobId}_image_${prompt.index}.png`;
+    const imagePath = this.filesystemService.getTempPath(imageFileName);
+
+    try {
+      this.logger.log('Generating image with Replicate API');
+
+      // Use SDXL for high-quality images
+      const output = (await this.replicate.run(
+        'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+        {
+          input: {
+            prompt: prompt.prompt,
+            width: 1280,
+            height: 720,
+            num_outputs: 1,
+          },
+        },
+      )) as string[];
+
+      if (!output || output.length === 0) {
+        throw new Error('No image returned from Replicate');
+      }
+
+      // Download the image
+      const imageUrl = output[0];
+      const imageResponse = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+      });
+
+      fs.writeFileSync(imagePath, imageResponse.data);
+      this.logger.log(`Image generated via Replicate: ${imagePath}`);
+
+      // Convert image to video with zoom/pan effect
+      await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
+
+      this.logger.log(`Video created from image: ${outputPath}`);
+
+      // Save to debug
+      this.filesystemService.saveToDebug(
+        `${jobId}_clip_${prompt.index}.mp4`,
+        fs.readFileSync(outputPath),
+      );
+
+      return outputPath;
+    } catch (error) {
+      this.logger.error(`Replicate API error: ${error.message}`);
       return this.createPlaceholderVideo(prompt, jobId);
     }
   }

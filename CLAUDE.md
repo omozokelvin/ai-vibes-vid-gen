@@ -141,3 +141,5 @@ See `.env.example` for full list.
 
 For detailed information on specific topics, see:
 - [Architectural Patterns](.claude/docs/architectural_patterns.md) - DI, decorators, job queues, error handling
+- [Video Generation Fix](.claude/docs/video_generation_fix.md) - ESM/CommonJS fix, image-to-video approach
+- [Hugging Face Models](.claude/docs/huggingface_models.md) - Working models, troubleshooting, API errors
