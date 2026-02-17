@@ -14,38 +14,18 @@ import { FilesystemService } from '../filesystem/filesystem.service';
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
   private hfApiKey: string;
-  private hfInferenceUrl: string;
   private hfModelId: string;
-  private hfVideoProvider: 'space' | 'inference';
-  private hfSpaceName: string;
-  private hfSpaceEndpoint: string;
-  private hfSpaceInputs: string;
 
   constructor(
     private configService: ConfigService,
     private filesystemService: FilesystemService,
   ) {
     this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
+    // Use a reliable text-to-image model (Stable Diffusion) instead of text-to-video
+    // We'll convert images to videos with FFmpeg
     this.hfModelId =
-      this.configService.get<string>('HUGGINGFACE_VIDEO_MODEL') ||
-      'damo-vilab/text-to-video-ms-1.7b';
-    this.hfVideoProvider =
-      (
-        this.configService.get<string>('HUGGINGFACE_VIDEO_PROVIDER') || 'space'
-      ).toLowerCase() === 'inference'
-        ? 'inference'
-        : 'space';
-    this.hfSpaceName =
-      this.configService.get<string>('HUGGINGFACE_SPACE_NAME') ||
-      'genmo/mochi-1-preview';
-    this.hfSpaceEndpoint =
-      this.configService.get<string>('HUGGINGFACE_SPACE_ENDPOINT') ||
-      '/predict';
-    this.hfSpaceInputs =
-      this.configService.get<string>('HUGGINGFACE_SPACE_INPUTS') || '';
-    this.hfInferenceUrl =
-      this.configService.get<string>('HUGGINGFACE_INFERENCE_URL') ||
-      `https://api-inference.huggingface.co/models/${this.hfModelId}`;
+      this.configService.get<string>('HUGGINGFACE_IMAGE_MODEL') ||
+      'stabilityai/stable-diffusion-2-1';
   }
 
   async generateMedia(
@@ -210,88 +190,55 @@ export class MediaService {
     const videoFileName = `${jobId}_clip_${prompt.index}.mp4`;
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
-    if (this.hfVideoProvider === 'space') {
-      return this.generateSingleVideoViaSpace(prompt, jobId, outputPath);
+    // Try to generate image with Hugging Face, then convert to video
+    if (this.hfApiKey) {
+      return this.generateVideoFromImage(prompt, jobId, outputPath);
     }
 
-    return this.generateSingleVideoViaInference(prompt, jobId, outputPath);
+    // Fallback to placeholder
+    this.logger.warn('No Hugging Face API key configured, using placeholder');
+    return this.createPlaceholderVideo(prompt, jobId);
   }
 
-  private async generateSingleVideoViaInference(
+  private async generateVideoFromImage(
     prompt: VisualPrompt,
     jobId: string,
     outputPath: string,
   ): Promise<string> {
-    if (!this.hfApiKey) {
-      this.logger.warn(
-        'Hugging Face API key not configured, using placeholder',
-      );
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
+    const imageFileName = `${jobId}_image_${prompt.index}.png`;
+    const imagePath = this.filesystemService.getTempPath(imageFileName);
 
     try {
+      // Generate image using Hugging Face Inference API
+      const inferenceUrl = `https://api-inference.huggingface.co/models/${this.hfModelId}`;
+
+      this.logger.log(`Generating image from: ${this.hfModelId}`);
+
       const response = await axios.post(
-        this.hfInferenceUrl,
+        inferenceUrl,
         {
           inputs: prompt.prompt,
         },
         {
           headers: {
             Authorization: `Bearer ${this.hfApiKey}`,
-            Accept: 'video/mp4',
+            'Content-Type': 'application/json',
           },
           responseType: 'arraybuffer',
           timeout: 120000, // 2 minutes timeout
         },
       );
 
-      fs.writeFileSync(outputPath, response.data);
-      this.logger.log(`Video generated: ${outputPath}`);
+      // Save the image
+      fs.writeFileSync(imagePath, response.data);
+      this.logger.log(`Image generated: ${imagePath}`);
 
-      this.filesystemService.saveToDebug(
-        `${jobId}_clip_${prompt.index}.mp4`,
-        response.data,
-      );
+      // Convert image to video with zoom/pan effect using FFmpeg
+      await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
 
-      return outputPath;
-    } catch (error) {
-      const status = error?.response?.status;
-      if (status === 410) {
-        this.logger.error(
-          `Hugging Face model is no longer available (410). Update HUGGINGFACE_VIDEO_MODEL or HUGGINGFACE_INFERENCE_URL. Current model: ${this.hfModelId}`,
-        );
-      } else {
-        this.logger.error(`Hugging Face API error: ${error.message}`);
-      }
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
-  }
+      this.logger.log(`Video created from image: ${outputPath}`);
 
-  private async generateSingleVideoViaSpace(
-    prompt: VisualPrompt,
-    jobId: string,
-    outputPath: string,
-  ): Promise<string> {
-    if (!this.hfSpaceName) {
-      this.logger.warn('Hugging Face Space not configured, using placeholder');
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
-
-    try {
-      const gradioClient = await this.loadGradioClient();
-      const app = await gradioClient(this.hfSpaceName, {
-        hf_token: this.getHfToken(),
-      });
-      const inputs = this.getSpaceInputs(prompt.prompt);
-      const result = await app.predict(this.hfSpaceEndpoint, inputs);
-      const source = this.extractVideoSource(result);
-
-      if (!source) {
-        throw new Error('No video output found in Space response');
-      }
-
-      await this.saveVideoFromSource(source, outputPath);
-      this.logger.log(`Video generated: ${outputPath}`);
+      // Save to debug
       this.filesystemService.saveToDebug(
         `${jobId}_clip_${prompt.index}.mp4`,
         fs.readFileSync(outputPath),
@@ -299,117 +246,68 @@ export class MediaService {
 
       return outputPath;
     } catch (error) {
-      this.logger.error(`Hugging Face Space error: ${error.message}`);
+      const status = error?.response?.status;
+      if (status === 503) {
+        this.logger.warn(
+          `Model is loading (503). Using placeholder. Model: ${this.hfModelId}`,
+        );
+      } else if (status === 401) {
+        this.logger.error('Invalid Hugging Face API key');
+      } else {
+        this.logger.error(`Hugging Face API error: ${error.message}`);
+      }
       return this.createPlaceholderVideo(prompt, jobId);
     }
   }
 
-  private getSpaceInputs(prompt: string): unknown[] {
-    if (!this.hfSpaceInputs) {
-      return [prompt];
-    }
-
-    try {
-      const parsed = JSON.parse(this.hfSpaceInputs);
-      if (!Array.isArray(parsed)) {
-        this.logger.warn(
-          'HUGGINGFACE_SPACE_INPUTS is not an array, falling back to [prompt]',
-        );
-        return [prompt];
-      }
-
-      return parsed.map((value) =>
-        typeof value === 'string'
-          ? value.replace(/\{\{prompt\}\}/g, prompt)
-          : value,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Failed to parse HUGGINGFACE_SPACE_INPUTS: ${error.message}`,
-      );
-      return [prompt];
-    }
-  }
-
-  private async loadGradioClient(): Promise<
-    (
-      space: string,
-      options?: { hf_token?: `hf_${string}` },
-    ) => Promise<{
-      predict: (endpoint: string, inputs: unknown[]) => Promise<unknown>;
-    }>
-  > {
-    // Dynamic import for ESM module
-    const mod = await import('@gradio/client');
-    return mod.client as typeof mod.client;
-  }
-
-  private getHfToken(): `hf_${string}` | undefined {
-    if (!this.hfApiKey) {
-      return undefined;
-    }
-
-    return this.hfApiKey.startsWith('hf_')
-      ? (this.hfApiKey as `hf_${string}`)
-      : undefined;
-  }
-
-  private extractVideoSource(result: unknown): string | null {
-    const data = (result as { data?: unknown }).data ?? result;
-    const candidates = Array.isArray(data) ? data : [data];
-
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string') {
-        if (candidate.startsWith('http')) {
-          return candidate;
-        }
-        if (candidate.startsWith('data:video')) {
-          return candidate;
-        }
-      }
-
-      if (candidate && typeof candidate === 'object') {
-        const typed = candidate as {
-          url?: string;
-          path?: string;
-          file?: { url?: string; path?: string };
-        };
-
-        if (typed.url) {
-          return typed.url;
-        }
-
-        if (typed.path) {
-          return typed.path;
-        }
-
-        if (typed.file?.url) {
-          return typed.file.url;
-        }
-
-        if (typed.file?.path) {
-          return typed.file.path;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private async saveVideoFromSource(
-    source: string,
+  private convertImageToVideo(
+    imagePath: string,
     outputPath: string,
+    duration: number = 5,
   ): Promise<void> {
-    if (source.startsWith('data:')) {
-      const base64 = source.split(',')[1] || '';
-      fs.writeFileSync(outputPath, Buffer.from(base64, 'base64'));
-      return;
-    }
+    return new Promise((resolve, reject) => {
+      // Create video from image with slow zoom effect
+      const args = [
+        '-loop',
+        '1',
+        '-i',
+        imagePath,
+        '-vf',
+        `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(zoom+0.0015,1.5)':d=${duration * 25}:s=1280x720,fps=25`,
+        '-t',
+        duration.toString(),
+        '-c:v',
+        'libx264',
+        '-pix_fmt',
+        'yuv420p',
+        '-y',
+        outputPath,
+      ];
 
-    const response = await axios.get(source, {
-      responseType: 'arraybuffer',
+      const ffmpeg = spawn('ffmpeg', args);
+
+      let stderr = '';
+
+      ffmpeg.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `ffmpeg image-to-video failed with code ${code}: ${stderr}`,
+            ),
+          );
+        }
+      });
+
+      ffmpeg.on('error', (error) => {
+        reject(error);
+      });
     });
-    fs.writeFileSync(outputPath, response.data);
   }
 
   private async createPlaceholderVideo(
