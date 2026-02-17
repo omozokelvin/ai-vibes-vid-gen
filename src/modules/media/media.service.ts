@@ -33,22 +33,32 @@ export class MediaService {
     this.useFreeAI = this.configService.get<string>('USE_FREE_AI') === 'true';
 
     // Priority: Free AI (Stable Horde) > Replicate > Hugging Face > None
-    const replicateApiKey = this.configService.get<string>('REPLICATE_API_TOKEN');
+    const replicateApiKey = this.configService.get<string>(
+      'REPLICATE_API_TOKEN',
+    );
 
     if (this.useFreeAI) {
       this.imageProvider = 'stablehorde';
-      this.logger.log('Using Stable Horde (FREE, no API key) for image generation');
-      this.logger.warn('Note: Free generation may be slow (30-120s per image) depending on community availability');
+      this.logger.log(
+        'Using Stable Horde (FREE, no API key) for image generation',
+      );
+      this.logger.warn(
+        'Note: Free generation may be slow (30-120s per image) depending on community availability',
+      );
     } else if (replicateApiKey) {
       this.replicate = new Replicate({ auth: replicateApiKey });
       this.imageProvider = 'replicate';
       this.logger.log('Using Replicate for image generation');
     } else if (this.hfApiKey) {
       this.imageProvider = 'huggingface';
-      this.logger.log('Using Hugging Face for image generation (may fail with 410)');
+      this.logger.log(
+        'Using Hugging Face for image generation (may fail with 410)',
+      );
     } else {
       this.imageProvider = 'none';
-      this.logger.warn('No image generation API configured, using placeholders');
+      this.logger.warn(
+        'No image generation API configured, using placeholders',
+      );
     }
   }
 
@@ -305,21 +315,27 @@ export class MediaService {
     const imagePath = this.filesystemService.getTempPath(imageFileName);
 
     try {
-      this.logger.log('Requesting image from Stable Horde (FREE, community-powered)...');
+      this.logger.log(
+        'Requesting image from Stable Horde (FREE, community-powered)...',
+      );
 
       // Step 1: Submit generation request
       const requestBody = {
         prompt: prompt.prompt,
         params: {
-          width: 1280,
-          height: 720,
-          steps: 25,
-          cfg_scale: 7,
+          width: 1024, // Standard size for better compatibility
+          height: 576, // 16:9 ratio
+          steps: 20,
+          cfg_scale: 7.5,
           sampler_name: 'k_euler_a',
+          n: 1,
         },
         nsfw: false,
         censor_nsfw: true,
-        models: ['stable_diffusion'], // Use stable diffusion models
+        trusted_workers: false,
+        slow_workers: true,
+        workers: [],
+        models: [], // Empty = use any available model
       };
 
       const submitResponse = await axios.post(
@@ -328,27 +344,29 @@ export class MediaService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Client-Agent': 'VideoGenerator:1.0:contact@example.com',
+            apikey: '0000000000', // Anonymous API key
           },
-          timeout: 10000,
+          timeout: 15000,
         },
       );
 
       const requestId = submitResponse.data.id;
       this.logger.log(`Stable Horde request submitted: ${requestId}`);
-      this.logger.log('Waiting for community workers to generate image (this may take 30-120 seconds)...');
+      this.logger.log(
+        'Waiting for community workers to generate image (this may take 30-120 seconds)...',
+      );
 
       // Step 2: Poll for result
       let attempts = 0;
       const maxAttempts = 40; // 40 attempts * 3 seconds = 2 minutes max
 
       while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
         attempts++;
 
         const statusResponse = await axios.get(
           `https://stablehorde.net/api/v2/generate/check/${requestId}`,
-          { timeout: 10000 }
+          { timeout: 10000 },
         );
 
         const status = statusResponse.data;
@@ -359,7 +377,7 @@ export class MediaService {
           // Step 3: Get the generated image
           const resultResponse = await axios.get(
             `https://stablehorde.net/api/v2/generate/status/${requestId}`,
-            { timeout: 10000 }
+            { timeout: 10000 },
           );
 
           const imageUrl = resultResponse.data.generations[0]?.img;
@@ -378,7 +396,11 @@ export class MediaService {
           this.logger.log(`Image generated via Stable Horde: ${imagePath}`);
 
           // Convert to video
-          await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
+          await this.convertImageToVideo(
+            imagePath,
+            outputPath,
+            prompt.duration,
+          );
           this.logger.log(`Video created from image: ${outputPath}`);
 
           // Save to debug
@@ -396,15 +418,18 @@ export class MediaService {
 
         // Log progress every 5 attempts
         if (attempts % 5 === 0) {
-          this.logger.log(`Still waiting... (${attempts * 3}s elapsed, queue position: ${status.queue_position || 'unknown'})`);
+          this.logger.log(
+            `Still waiting... (${attempts * 3}s elapsed, queue position: ${status.queue_position || 'unknown'})`,
+          );
         }
       }
 
       throw new Error('Timeout waiting for Stable Horde generation');
-
     } catch (error) {
       this.logger.error(`Stable Horde error: ${error.message}`);
-      this.logger.warn('Falling back to placeholder video. For faster/reliable generation, consider Replicate API (~$0.003/image)');
+      this.logger.warn(
+        'Falling back to placeholder video. For faster/reliable generation, consider Replicate API (~$0.003/image)',
+      );
       return this.createPlaceholderVideo(prompt, jobId);
     }
   }
