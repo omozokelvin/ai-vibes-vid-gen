@@ -8,7 +8,7 @@ AI-powered video generation system that creates videos from text prompts using o
 
 **Framework:** NestJS 10.0 (TypeScript 5.1)
 **Queue:** BullMQ with Redis backend
-**AI APIs:** Google Gemini (script), Hugging Face (video), Edge TTS (audio)
+**AI APIs:** Google Gemini (script), Kling AI (video), Hugging Face/Stable Horde (image fallback), Edge TTS (audio)
 **Media:** FFmpeg via fluent-ffmpeg
 **Social:** YouTube API v3, TikTok (placeholder)
 **Validation:** class-validator, class-transformer
@@ -48,7 +48,7 @@ src/
 
 ### Environment Setup
 1. Copy `.env.example` to `.env`
-2. Add required API keys: `GEMINI_API_KEY`, `HUGGINGFACE_API_KEY`
+2. Add required API keys: `GEMINI_API_KEY`, `KLING_ACCESS_KEY`, `KLING_SECRET_KEY`
 3. Configure Redis: `REDIS_HOST`, `REDIS_PORT` (defaults: localhost:6379)
 4. Optional: Add YouTube/TikTok credentials for uploads
 
@@ -99,9 +99,12 @@ npm run format           # Prettier
 
 **Critical Environment Variables:**
 - `GEMINI_API_KEY` - Google Gemini for script generation
-- `HUGGINGFACE_API_KEY` - Video generation
-- `HUGGINGFACE_VIDEO_PROVIDER` - `space` or `inference`
-- `HUGGINGFACE_SPACE_NAME` - Space ID (default: genmo/mochi-1-preview)
+- `KLING_ACCESS_KEY` - Kling AI video generation (from klingai.com/global/dev)
+- `KLING_SECRET_KEY` - Kling AI secret key
+- `KLING_MODEL` - Model version (default: kling-v2-master)
+- `KLING_MODE` - Generation mode: `std` or `pro`
+- `HUGGINGFACE_API_KEY` - Image generation (fallback)
+- `HUGGINGFACE_IMAGE_MODEL` - HF model ID (fallback)
 - `YOUTUBE_*` - YouTube upload credentials (optional)
 - `REDIS_HOST`, `REDIS_PORT` - Job queue backend
 - `TEMP_DIR`, `DEBUG_DIR` - File storage paths

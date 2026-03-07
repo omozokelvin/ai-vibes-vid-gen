@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
+import * as jwt from 'jsonwebtoken';
 import Replicate from 'replicate';
 import {
   VisualPrompt,
@@ -17,8 +18,14 @@ export class MediaService {
   private hfApiKey: string;
   private hfModelId: string;
   private replicate: Replicate | null = null;
-  private imageProvider: 'huggingface' | 'replicate' | 'stablehorde' | 'none';
-  private useFreeAI: boolean;
+  private klingAccessKey: string;
+  private klingSecretKey: string;
+  private imageProvider:
+    | 'kling'
+    | 'huggingface'
+    | 'replicate'
+    | 'stablehorde'
+    | 'none';
 
   constructor(
     private configService: ConfigService,
@@ -29,22 +36,21 @@ export class MediaService {
       this.configService.get<string>('HUGGINGFACE_IMAGE_MODEL') ||
       'runwayml/stable-diffusion-v1-5';
 
-    // Check for free AI preference
-    this.useFreeAI = this.configService.get<string>('USE_FREE_AI') === 'true';
-
-    // Priority: Free AI (Stable Horde) > Replicate > Hugging Face > None
+    // Provider is chosen based on which API keys are configured
+    // Priority: Kling AI > Replicate > Hugging Face > Stable Horde > None
+    const klingAccessKey = this.configService.get<string>('KLING_ACCESS_KEY');
+    const klingSecretKey = this.configService.get<string>('KLING_SECRET_KEY');
     const replicateApiKey = this.configService.get<string>(
       'REPLICATE_API_TOKEN',
     );
 
-    if (this.useFreeAI) {
-      this.imageProvider = 'stablehorde';
+    if (klingAccessKey && klingSecretKey) {
+      this.imageProvider = 'kling';
       this.logger.log(
-        'Using Stable Horde (FREE, no API key) for image generation',
+        'Using Kling AI for real AI video generation (text-to-video)',
       );
-      this.logger.warn(
-        'Note: Free generation may be slow (30-120s per image) depending on community availability',
-      );
+      this.klingAccessKey = klingAccessKey;
+      this.klingSecretKey = klingSecretKey;
     } else if (replicateApiKey) {
       this.replicate = new Replicate({ auth: replicateApiKey });
       this.imageProvider = 'replicate';
@@ -55,11 +61,27 @@ export class MediaService {
         'Using Hugging Face for image generation (may fail with 410)',
       );
     } else {
-      this.imageProvider = 'none';
+      this.imageProvider = 'stablehorde';
+      this.logger.log(
+        'Using Stable Horde (FREE, no API key) for image generation',
+      );
       this.logger.warn(
-        'No image generation API configured, using placeholders',
+        'Note: Free generation may be slow (30-120s per image) depending on community availability',
       );
     }
+  }
+
+  private getKlingToken(): string {
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: this.klingAccessKey,
+      exp: now + 1800,
+      nbf: now - 5,
+    };
+    return jwt.sign(payload, this.klingSecretKey, {
+      algorithm: 'HS256',
+      header: { alg: 'HS256', typ: 'JWT' },
+    });
   }
 
   async generateMedia(
@@ -224,8 +246,10 @@ export class MediaService {
     const videoFileName = `${jobId}_clip_${prompt.index}.mp4`;
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
-    // Try image generation based on available provider
-    if (this.imageProvider === 'stablehorde') {
+    // Try video/image generation based on available provider
+    if (this.imageProvider === 'kling') {
+      return this.generateVideoWithKling(prompt, jobId, outputPath);
+    } else if (this.imageProvider === 'stablehorde') {
       return this.generateVideoFromImageStableHorde(prompt, jobId, outputPath);
     } else if (this.imageProvider === 'replicate') {
       return this.generateVideoFromImageReplicate(prompt, jobId, outputPath);
@@ -236,6 +260,112 @@ export class MediaService {
     // Fallback to placeholder
     this.logger.warn('No image generation API configured, using placeholder');
     return this.createPlaceholderVideo(prompt, jobId);
+  }
+
+  private async generateVideoWithKling(
+    prompt: VisualPrompt,
+    jobId: string,
+    outputPath: string,
+  ): Promise<string> {
+    const baseUrl = 'https://api-singapore.klingai.com';
+
+    try {
+      const klingModel =
+        this.configService.get<string>('KLING_MODEL') || 'kling-v2-master';
+      const klingMode = this.configService.get<string>('KLING_MODE') || 'std';
+      const duration = prompt.duration <= 5 ? '5' : '10';
+
+      this.logger.log(
+        `Generating video with Kling AI (model: ${klingModel}, mode: ${klingMode}, duration: ${duration}s)`,
+      );
+
+      const token = this.getKlingToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      // Create text-to-video task
+      const taskResponse = await axios.post(
+        `${baseUrl}/v1/videos/text2video`,
+        {
+          prompt: prompt.prompt,
+          model_name: klingModel,
+          mode: klingMode,
+          duration: duration,
+          aspect_ratio: '16:9',
+        },
+        { headers, timeout: 30000 },
+      );
+
+      if (taskResponse.data.code !== 0) {
+        throw new Error(`Kling API error: ${taskResponse.data.message}`);
+      }
+
+      const taskId = taskResponse.data.data.task_id;
+      this.logger.log(`Kling AI task created: ${taskId}`);
+
+      // Poll for result (max 5 minutes)
+      const maxAttempts = 60;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        const freshToken = this.getKlingToken();
+        const result = await axios.get(
+          `${baseUrl}/v1/videos/text2video/${taskId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+            },
+            timeout: 15000,
+          },
+        );
+
+        const status = result.data.data.task_status;
+
+        if (status === 'succeed') {
+          const videoUrl = result.data.data.task_result?.videos?.[0]?.url;
+          if (!videoUrl) {
+            throw new Error('No video URL in Kling AI result');
+          }
+
+          this.logger.log('Kling AI video generated, downloading...');
+
+          const videoResponse = await axios.get(videoUrl, {
+            responseType: 'arraybuffer',
+            timeout: 60000,
+          });
+
+          fs.writeFileSync(outputPath, videoResponse.data);
+          this.logger.log(`Kling AI video saved: ${outputPath}`);
+
+          this.filesystemService.saveToDebug(
+            `${jobId}_clip_${prompt.index}.mp4`,
+            fs.readFileSync(outputPath),
+          );
+
+          return outputPath;
+        }
+
+        if (status === 'failed') {
+          throw new Error(
+            `Kling AI task failed: ${result.data.data.task_status_msg || 'unknown reason'}`,
+          );
+        }
+
+        if (attempt % 6 === 0) {
+          this.logger.log(
+            `Kling AI still processing... (${(attempt + 1) * 5}s elapsed, status: ${status})`,
+          );
+        }
+      }
+
+      throw new Error('Kling AI task timed out after 5 minutes');
+    } catch (error) {
+      this.logger.error(`Kling AI error: ${error.message}`);
+      this.logger.warn('Falling back to placeholder video');
+      return this.createPlaceholderVideo(prompt, jobId);
+    }
   }
 
   private async generateVideoFromImage(
