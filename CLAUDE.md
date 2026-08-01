@@ -122,7 +122,7 @@ See `.env.example` for full list.
 1. **Async Job Queue:** Prevents API overload, enables retry logic, provides progress tracking
 2. **Graceful Degradation:** Fallbacks at every step (fallback script, placeholder videos, silent audio)
 3. **Modular Services:** Each domain isolated for independent testing and potential microservice migration
-4. **Free APIs Only:** Uses only free-tier services (Gemini, Hugging Face, Edge TTS, YouTube API)
+4. **Local Image Generation:** Scene images come from a local ComfyUI instance (free, no API costs); only script generation uses a cloud API (Gemini)
 5. **File System Abstraction:** Separate temp/debug directories for easier troubleshooting
 
 ## File References
@@ -155,5 +155,6 @@ See `.env.example` for full list.
 For detailed information on specific topics, see:
 
 - [Architectural Patterns](.claude/docs/architectural_patterns.md) - DI, decorators, job queues, error handling
-- [Video Generation Fix](.claude/docs/video_generation_fix.md) - ESM/CommonJS fix, image-to-video approach
-- [Hugging Face Models](.claude/docs/huggingface_models.md) - Working models, troubleshooting, API errors
+- [Local Image Generation (ComfyUI)](.claude/docs/local_image_generation.md) - ComfyUI setup, SDXL model, API flow
+- [Video Generation Fix](.claude/docs/video_generation_fix.md) - ESM/CommonJS fix, image-to-video approach (historical)
+- [Hugging Face Models](.claude/docs/huggingface_models.md) - Historical; Hugging Face image generation is deprecated

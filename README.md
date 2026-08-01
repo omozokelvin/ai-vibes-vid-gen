@@ -5,7 +5,7 @@ AI-powered video generation system using free APIs and NestJS. This application 
 ## Features
 
 - **🎬 Script Generation**: Uses Google Gemini API (free tier) to generate video scripts and visual prompts
-- **🎥 Video Generation**: Leverages Hugging Face Inference API for text-to-video generation
+- **🎥 Video Generation**: Generates scene images locally with ComfyUI (SDXL) and animates them with FFmpeg
 - **🎙️ Audio Synthesis**: Uses Edge-TTS (Microsoft Edge's free TTS) for high-quality voice narration
 - **📝 Subtitle Generation**: Automatically creates synchronized subtitles (.srt format)
 - **🎞️ Video Assembly**: Uses FFMPEG to stitch audio, video, and subtitles together
@@ -29,6 +29,7 @@ The application follows a modular architecture with 5 core modules:
 - Redis (for BullMQ)
 - FFMPEG (with libx264 and aac support)
 - edge-tts (Microsoft Edge TTS)
+- ComfyUI (local scene image generation) — https://github.com/comfyanonymous/ComfyUI
 
 ### Installing Prerequisites
 
@@ -86,26 +87,15 @@ Edit `.env` file with your API credentials:
 PORT=3000
 NODE_ENV=development
 
-# Google Gemini API (Free Tier)
+# Google Gemini API (script generation only)
 # Get your key from: https://makersuite.google.com/app/apikey
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Hugging Face API (Free Tier)
-# Get your key from: https://huggingface.co/settings/tokens
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-# Video generation provider: "space" (free) or "inference"
-HUGGINGFACE_VIDEO_PROVIDER=space
-
-# Hugging Face Space (default: genmo/mochi-1-preview)
-HUGGINGFACE_SPACE_NAME=genmo/mochi-1-preview
-HUGGINGFACE_SPACE_ENDPOINT=/predict
-# Optional: JSON array of inputs for the Space; use {{prompt}} as a placeholder
-# HUGGINGFACE_SPACE_INPUTS=["{{prompt}}"]
-
-# Inference API (legacy)
-HUGGINGFACE_VIDEO_MODEL=damo-vilab/text-to-video-ms-1.7b
-# Optional: override full inference URL (useful for private endpoints)
-# HUGGINGFACE_INFERENCE_URL=https://api-inference.huggingface.co/models/your-model
+# Local image generation via ComfyUI (free, runs on your machine)
+# Install: https://github.com/comfyanonymous/ComfyUI
+# Model: download sd_xl_base_1.0.safetensors into ComfyUI/models/checkpoints
+LOCAL_IMAGE_API_URL=http://127.0.0.1:8188
+LOCAL_IMAGE_MODEL=sd_xl_base_1.0.safetensors
 
 # YouTube API (Optional - for uploads)
 # Setup: https://console.cloud.google.com/
@@ -247,7 +237,8 @@ ai-vibes-vid-gen/
 2. **Job is queued** in BullMQ for async processing
 3. **Script Generation**: Gemini AI generates a structured script with visual prompts and timestamps
 4. **Media Generation**:
-   - Video clips are generated using Hugging Face text-to-video models
+   - Scene images are generated via local ComfyUI (SDXL) for each visual prompt
+   - Each image is animated into a clip with FFmpeg (Ken Burns zoom/pan)
    - Audio is synthesized using Edge-TTS
    - Subtitles are created from the timestamps
 5. **Video Assembly**: FFMPEG combines all media:
@@ -260,23 +251,24 @@ ai-vibes-vid-gen/
 
 ## Cost Optimization
 
-This system uses **100% free APIs and tools**:
+This system uses **free APIs and local tools**:
 
-- ✅ Google Gemini API (Free tier)
-- ✅ Hugging Face Inference API (Free tier)
+- ✅ Google Gemini API (Free tier, script generation only)
+- ✅ ComfyUI local SDXL (free, scene images)
 - ✅ Edge-TTS (Free, unlimited)
 - ✅ FFMPEG (Open source, free)
 - ✅ YouTube Data API v3 (Free quota)
 
-**Note**: Video quality from free APIs may be limited. For production use, consider upgrading to paid tiers for higher quality outputs.
+**Note**: Scene quality depends on the local SDXL model and your GPU. For higher quality outputs, swap the SDXL checkpoint or increase `steps` in `buildSdxlWorkflow`.
 
 ## Troubleshooting
 
 ### Videos Not Generating
 
-- Check that Hugging Face API key is valid
-- The free tier may have rate limits - wait and retry
-- Check `./debug` folder for intermediate files
+- Check that ComfyUI is running: `curl http://127.0.0.1:8188/system_stats`
+- Verify `LOCAL_IMAGE_API_URL` points at the ComfyUI base URL (no trailing slash)
+- Verify the SDXL checkpoint exists in `ComfyUI/models/checkpoints` and matches `LOCAL_IMAGE_MODEL`
+- If ComfyUI fails, the pipeline falls back to blue placeholder clips — check `./debug` and the logs
 
 ### Audio Not Working
 
@@ -366,7 +358,7 @@ MIT
 ## Acknowledgments
 
 - Google Gemini for AI script generation
-- Hugging Face for video generation models
+- ComfyUI for local scene image generation
 - Microsoft Edge TTS for audio synthesis
 - NestJS framework
 - FFMPEG for video processing

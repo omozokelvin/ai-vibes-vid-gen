@@ -1,5 +1,7 @@
 # Video Generation Fix - ESM to Image-to-Video Approach
 
+> **⚠️ HISTORICAL** — The image source is no longer Hugging Face; scene images are now generated locally via ComfyUI. See [local_image_generation.md](local_image_generation.md). The image-to-video (FFmpeg animation) approach described here is still how clips are produced.
+
 ## Problem
 
 The original implementation used `@gradio/client` (ESM-only package) which had compatibility issues with NestJS's CommonJS compilation, causing "Cannot find module" errors.

@@ -162,7 +162,7 @@ curl http://localhost:3000/video/status/FAILED_JOB_ID
 ```
 
 Common errors:
-- **Missing API keys**: Configure GEMINI_API_KEY and HUGGINGFACE_API_KEY
+- **Missing API keys**: Configure GEMINI_API_KEY (script) and ensure ComfyUI is running with LOCAL_IMAGE_API_URL / LOCAL_IMAGE_MODEL set
 - **Redis not running**: Start Redis server
 - **FFMPEG not found**: Install FFMPEG with required codecs
 - **edge-tts not found**: Install via `pip install edge-tts`
