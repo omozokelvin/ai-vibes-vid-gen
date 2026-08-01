@@ -223,18 +223,26 @@ export class MediaService {
     );
 
     try {
-      const checkpoint =
+      // Z-Image turbo uses three separate model files (diffusion, CLIP, VAE)
+      const diffusionModel =
         this.configService.get<string>('LOCAL_IMAGE_MODEL') ||
-        'sd_xl_base_1.0.safetensors';
+        'z_image_turbo_bf16.safetensors';
+      const clipModel =
+        this.configService.get<string>('LOCAL_IMAGE_CLIP') ||
+        'qwen_3_4b.safetensors';
+      const vaeModel =
+        this.configService.get<string>('LOCAL_IMAGE_VAE') || 'ae.safetensors';
 
       this.logger.log(
-        `Submitting image workflow to ComfyUI (${baseUrl}, checkpoint: ${checkpoint})`,
+        `Submitting Z-Image workflow to ComfyUI (${baseUrl}, model: ${diffusionModel})`,
       );
 
-      // Step 1: Submit the SDXL workflow
-      const workflow = this.buildSdxlWorkflow(
+      // Step 1: Submit the Z-Image turbo workflow
+      const workflow = this.buildZImageWorkflow(
         prompt.prompt,
-        checkpoint,
+        diffusionModel,
+        clipModel,
+        vaeModel,
         1024,
         576,
       );
@@ -324,53 +332,66 @@ export class MediaService {
     }
   }
 
-  private buildSdxlWorkflow(
+  private buildZImageWorkflow(
     positivePrompt: string,
-    checkpoint: string,
+    diffusionModel: string,
+    clipModel: string,
+    vaeModel: string,
     width: number,
     height: number,
   ): Record<string, unknown> {
     const seed = Math.floor(Math.random() * 1000000);
     return {
       '1': {
-        class_type: 'CheckpointLoaderSimple',
-        inputs: { ckpt_name: checkpoint },
+        class_type: 'UNETLoader',
+        inputs: { unet_name: diffusionModel, weight_dtype: 'default' },
       },
       '2': {
-        class_type: 'CLIPTextEncode',
-        inputs: { text: positivePrompt, clip: ['1', 1] },
+        class_type: 'CLIPLoader',
+        inputs: { clip_name: clipModel, type: 'qwen_image' },
       },
       '3': {
-        class_type: 'CLIPTextEncode',
-        inputs: { text: 'blurry, low quality, distorted', clip: ['1', 1] },
+        class_type: 'VAELoader',
+        inputs: { vae_name: vaeModel },
       },
       '4': {
-        class_type: 'EmptyLatentImage',
-        inputs: { width, height, batch_size: 1 },
+        class_type: 'CLIPTextEncode',
+        inputs: { text: positivePrompt, clip: ['2', 0] },
       },
       '5': {
-        class_type: 'KSampler',
+        class_type: 'CLIPTextEncode',
         inputs: {
-          model: ['1', 0],
-          positive: ['2', 0],
-          negative: ['3', 0],
-          latent_image: ['4', 0],
-          seed,
-          steps: 20,
-          cfg: 7.5,
-          sampler_name: 'euler',
-          scheduler: 'normal',
-          denoise: 1.0,
+          text: 'low quality, worst quality, blurry, distorted',
+          clip: ['2', 0],
         },
       },
       '6': {
-        class_type: 'VAEDecode',
-        inputs: { samples: ['5', 0], vae: ['1', 2] },
+        class_type: 'EmptySD3LatentImage',
+        inputs: { width, height, batch_size: 1 },
       },
       '7': {
+        class_type: 'KSampler',
+        inputs: {
+          model: ['1', 0],
+          positive: ['4', 0],
+          negative: ['5', 0],
+          latent_image: ['6', 0],
+          seed,
+          steps: 4,
+          cfg: 1.0,
+          sampler_name: 'euler',
+          scheduler: 'simple',
+          denoise: 1.0,
+        },
+      },
+      '8': {
+        class_type: 'VAEDecode',
+        inputs: { samples: ['7', 0], vae: ['3', 0] },
+      },
+      '9': {
         class_type: 'SaveImage',
         inputs: {
-          images: ['6', 0],
+          images: ['8', 0],
           filename_prefix: `ai_vibes_${Date.now()}`,
         },
       },

@@ -93,9 +93,11 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 # Local image generation via ComfyUI (free, runs on your machine)
 # Install: https://github.com/comfyanonymous/ComfyUI
-# Model: download sd_xl_base_1.0.safetensors into ComfyUI/models/checkpoints
+# Model: install the "image_z_image_turbo" template via ComfyUI's Model Manager
 LOCAL_IMAGE_API_URL=http://127.0.0.1:8188
-LOCAL_IMAGE_MODEL=sd_xl_base_1.0.safetensors
+LOCAL_IMAGE_MODEL=z_image_turbo_bf16.safetensors
+LOCAL_IMAGE_CLIP=qwen_3_4b.safetensors
+LOCAL_IMAGE_VAE=ae.safetensors
 
 # YouTube API (Optional - for uploads)
 # Setup: https://console.cloud.google.com/
@@ -237,7 +239,7 @@ ai-vibes-vid-gen/
 2. **Job is queued** in BullMQ for async processing
 3. **Script Generation**: Gemini AI generates a structured script with visual prompts and timestamps
 4. **Media Generation**:
-   - Scene images are generated via local ComfyUI (SDXL) for each visual prompt
+   - Scene images are generated via local ComfyUI (Z-Image turbo) for each visual prompt
    - Each image is animated into a clip with FFmpeg (Ken Burns zoom/pan)
    - Audio is synthesized using Edge-TTS
    - Subtitles are created from the timestamps
@@ -259,7 +261,7 @@ This system uses **free APIs and local tools**:
 - ✅ FFMPEG (Open source, free)
 - ✅ YouTube Data API v3 (Free quota)
 
-**Note**: Scene quality depends on the local SDXL model and your GPU. For higher quality outputs, swap the SDXL checkpoint or increase `steps` in `buildSdxlWorkflow`.
+**Note**: Scene quality depends on the local Z-Image model and your hardware. For different results, swap the model files or adjust the sampler settings in `buildZImageWorkflow`.
 
 ## Troubleshooting
 

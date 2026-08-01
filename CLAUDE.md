@@ -8,7 +8,7 @@ AI-powered video generation system that creates videos from text prompts. The sy
 
 **Framework:** NestJS 10.0 (TypeScript 5.1)
 **Queue:** BullMQ with Redis backend
-**AI APIs:** Google Gemini (script only), Edge TTS (audio), ComfyUI local SDXL (scene images) + FFmpeg animation
+**AI APIs:** Google Gemini (script only), Edge TTS (audio), ComfyUI local Z-Image turbo (scene images) + FFmpeg animation
 **Media:** FFmpeg via fluent-ffmpeg
 **Social:** YouTube API v3, TikTok (placeholder)
 **Validation:** class-validator, class-transformer
@@ -52,7 +52,7 @@ src/
 
 1. Copy `.env.example` to `.env`
 2. Add `GEMINI_API_KEY` for script generation
-3. Install and run ComfyUI locally, then set `LOCAL_IMAGE_API_URL` (default `http://127.0.0.1:8188`) and `LOCAL_IMAGE_MODEL` (e.g. `sd_xl_base_1.0.safetensors`) for scene image generation
+3. Install and run ComfyUI locally, install the `image_z_image_turbo` model template, then set `LOCAL_IMAGE_API_URL` (default `http://127.0.0.1:8188`), `LOCAL_IMAGE_MODEL`, `LOCAL_IMAGE_CLIP`, `LOCAL_IMAGE_VAE` for scene image generation
 4. Configure Redis: `REDIS_HOST`, `REDIS_PORT` (defaults: localhost:6379)
 5. Optional: Add YouTube/TikTok credentials for uploads
 
@@ -110,7 +110,9 @@ npm run format           # Prettier
 
 - `GEMINI_API_KEY` - Google Gemini for script generation only
 - `LOCAL_IMAGE_API_URL` - ComfyUI base URL for local scene image generation (e.g. `http://127.0.0.1:8188`)
-- `LOCAL_IMAGE_MODEL` - ComfyUI checkpoint file name (default: `sd_xl_base_1.0.safetensors`)
+- `LOCAL_IMAGE_MODEL` - Z-Image turbo diffusion model file (default: `z_image_turbo_bf16.safetensors`)
+- `LOCAL_IMAGE_CLIP` - Z-Image text encoder file (default: `qwen_3_4b.safetensors`)
+- `LOCAL_IMAGE_VAE` - Z-Image VAE file (default: `ae.safetensors`)
 - `YOUTUBE_*` - YouTube upload credentials (optional)
 - `REDIS_HOST`, `REDIS_PORT` - Job queue backend
 - `TEMP_DIR`, `DEBUG_DIR` - File storage paths
