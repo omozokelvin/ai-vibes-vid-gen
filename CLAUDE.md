@@ -2,7 +2,7 @@
 
 ## What
 
-AI-powered video generation system that creates videos from text prompts. The system generates scripts via Google Gemini, synthesizes audio with Edge TTS, generates scene images locally with ComfyUI (SDXL) and animates them with FFmpeg, then assembles videos with FFmpeg and optionally uploads to YouTube/TikTok.
+AI-powered video generation system that creates videos from text prompts. The system generates scripts via Google Gemini, synthesizes audio with Edge TTS, generates scene images locally with ComfyUI (Z-Image turbo) and animates them with FFmpeg, then assembles videos with FFmpeg and optionally uploads to YouTube/TikTok.
 
 ## Tech Stack
 
@@ -157,6 +157,6 @@ See `.env.example` for full list.
 For detailed information on specific topics, see:
 
 - [Architectural Patterns](.claude/docs/architectural_patterns.md) - DI, decorators, job queues, error handling
-- [Local Image Generation (ComfyUI)](.claude/docs/local_image_generation.md) - ComfyUI setup, SDXL model, API flow
+- [Local Image Generation (ComfyUI)](.claude/docs/local_image_generation.md) - ComfyUI setup, Z-Image turbo model, API flow
 - [Video Generation Fix](.claude/docs/video_generation_fix.md) - ESM/CommonJS fix, image-to-video approach (historical)
 - [Hugging Face Models](.claude/docs/huggingface_models.md) - Historical; Hugging Face image generation is deprecated

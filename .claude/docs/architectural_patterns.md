@@ -295,7 +295,7 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
    - See [script.service.ts:60-84](../../src/modules/script/script.service.ts#L60-L84)
 
 2. **Video Generation Fallback**
-   - Primary: ComfyUI (local SDXL image generation) + FFmpeg animation
+   - Primary: ComfyUI (local Z-Image turbo image generation) + FFmpeg animation
    - Fallback: Placeholder video files
    - See [media.service.ts](../../src/modules/media/media.service.ts)
 

@@ -19,7 +19,7 @@ This guide provides instructions for deploying the AI Vibes Video Generation sys
    - Get from: https://makersuite.google.com/app/apikey
 2. **ComfyUI** (local scene image generation — no API key needed)
    - Install: https://github.com/comfyanonymous/ComfyUI
-   - Download an SDXL checkpoint (e.g. `sd_xl_base_1.0.safetensors`) into `ComfyUI/models/checkpoints/`
+   - Install the `image_z_image_turbo` model template via ComfyUI's Model Manager (Z-Image turbo: diffusion + CLIP + VAE files)
 
 3. **YouTube Data API v3** (Optional - for uploads)
    - Setup OAuth2 credentials at: https://console.cloud.google.com/
@@ -105,7 +105,9 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 # Local image generation via ComfyUI (free, runs on the host)
 LOCAL_IMAGE_API_URL=http://127.0.0.1:8188
-LOCAL_IMAGE_MODEL=sd_xl_base_1.0.safetensors
+LOCAL_IMAGE_MODEL=z_image_turbo_bf16.safetensors
+LOCAL_IMAGE_CLIP=qwen_3_4b.safetensors
+LOCAL_IMAGE_VAE=ae.safetensors
 
 # Redis
 REDIS_HOST=localhost
@@ -213,6 +215,8 @@ services:
       # ComfyUI must be reachable from the container (e.g. host.docker.internal)
       - LOCAL_IMAGE_API_URL=http://host.docker.internal:8188
       - LOCAL_IMAGE_MODEL=${LOCAL_IMAGE_MODEL}
+      - LOCAL_IMAGE_CLIP=${LOCAL_IMAGE_CLIP}
+      - LOCAL_IMAGE_VAE=${LOCAL_IMAGE_VAE}
     volumes:
       - ./temp:/app/temp
       - ./debug:/app/debug

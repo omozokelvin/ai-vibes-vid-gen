@@ -5,7 +5,7 @@ AI-powered video generation system using free APIs and NestJS. This application 
 ## Features
 
 - **🎬 Script Generation**: Uses Google Gemini API (free tier) to generate video scripts and visual prompts
-- **🎥 Video Generation**: Generates scene images locally with ComfyUI (SDXL) and animates them with FFmpeg
+- **🎥 Video Generation**: Generates scene images locally with ComfyUI (Z-Image turbo) and animates them with FFmpeg
 - **🎙️ Audio Synthesis**: Uses Edge-TTS (Microsoft Edge's free TTS) for high-quality voice narration
 - **📝 Subtitle Generation**: Automatically creates synchronized subtitles (.srt format)
 - **🎞️ Video Assembly**: Uses FFMPEG to stitch audio, video, and subtitles together
@@ -256,7 +256,7 @@ ai-vibes-vid-gen/
 This system uses **free APIs and local tools**:
 
 - ✅ Google Gemini API (Free tier, script generation only)
-- ✅ ComfyUI local SDXL (free, scene images)
+- ✅ ComfyUI local Z-Image turbo (free, scene images)
 - ✅ Edge-TTS (Free, unlimited)
 - ✅ FFMPEG (Open source, free)
 - ✅ YouTube Data API v3 (Free quota)
