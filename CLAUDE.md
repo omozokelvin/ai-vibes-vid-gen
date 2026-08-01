@@ -108,12 +108,9 @@ npm run format           # Prettier
 
 **Critical Environment Variables:**
 
-- `GEMINI_API_KEY` - Google Gemini for script generation AND Veo video generation
-- `GEMINI_VIDEO_MODEL` - Veo model (default: `veo-2.0-generate-001`, or `veo-3.1-generate-preview`)
-- `KLING_ACCESS_KEY` - Kling AI video generation fallback (from klingai.com/global/dev)
-- `KLING_SECRET_KEY` - Kling AI secret key
-- `HUGGINGFACE_API_KEY` - Image generation (fallback)
-- `HUGGINGFACE_IMAGE_MODEL` - HF model ID (fallback)
+- `GEMINI_API_KEY` - Google Gemini for script generation only
+- `LOCAL_IMAGE_API_URL` - ComfyUI base URL for local scene image generation (e.g. `http://127.0.0.1:8188`)
+- `LOCAL_IMAGE_MODEL` - ComfyUI checkpoint file name (default: `sd_xl_base_1.0.safetensors`)
 - `YOUTUBE_*` - YouTube upload credentials (optional)
 - `REDIS_HOST`, `REDIS_PORT` - Job queue backend
 - `TEMP_DIR`, `DEBUG_DIR` - File storage paths
