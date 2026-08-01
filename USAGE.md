@@ -5,6 +5,7 @@ This document provides practical examples of using the AI Vibes Video Generation
 ## Prerequisites
 
 1. Ensure the application is running:
+
 ```bash
 npm run start:dev
 ```
@@ -26,6 +27,7 @@ curl -X POST http://localhost:3000/video/generate \
 ```
 
 Response:
+
 ```json
 {
   "message": "Video generation job started",
@@ -73,6 +75,7 @@ curl http://localhost:3000/video/status/1
 ```
 
 Response:
+
 ```json
 {
   "jobId": "1",
@@ -103,6 +106,7 @@ curl http://localhost:3000/video/jobs
 ```
 
 Response:
+
 ```json
 {
   "waiting": 2,
@@ -141,11 +145,13 @@ Jobs report progress at different stages:
 All intermediate files are saved for debugging:
 
 ### Debug Directory (`./debug/`)
+
 - `{jobId}_script.json`: Generated script data
 - `{jobId}_audio_raw.mp3`: Original audio file
 - `{jobId}_clip_{index}.mp4`: Individual video clips
 
 ### Temp Directory (`./temp/`)
+
 - `{jobId}_audio.mp3`: Processed audio
 - `{jobId}_clip_{index}.mp4`: Video clips
 - `{jobId}_subtitles.srt`: Subtitle file
@@ -162,6 +168,7 @@ curl http://localhost:3000/video/status/FAILED_JOB_ID
 ```
 
 Common errors:
+
 - **Missing API keys**: Configure GEMINI_API_KEY (script) and ensure ComfyUI is running with LOCAL_IMAGE_API_URL / LOCAL_IMAGE_MODEL set
 - **Redis not running**: Start Redis server
 - **FFMPEG not found**: Install FFMPEG with required codecs
@@ -182,7 +189,7 @@ Import this collection to test with Postman:
       "name": "Generate Video",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "http://localhost:3000/video/generate",
         "body": {
           "mode": "raw",
@@ -241,11 +248,11 @@ Modify FFMPEG parameters in `editor.service.ts`:
 ```typescript
 outputOptions([
   '-c:v libx264',
-  '-preset medium',  // faster/medium/slow
-  '-crf 23',         // 18-28, lower = better quality
+  '-preset medium', // faster/medium/slow
+  '-crf 23', // 18-28, lower = better quality
   '-c:a aac',
-  '-b:a 192k',       // audio bitrate
-])
+  '-b:a 192k', // audio bitrate
+]);
 ```
 
 ### Custom Video Resolution
@@ -259,17 +266,21 @@ const command = `ffmpeg -f lavfi -i color=c=blue:s=1920x1080:d=${duration} ...`;
 ## Troubleshooting
 
 ### Videos are too short
+
 - The free tier models may generate shorter clips
 - Videos are automatically looped to match audio length
 
 ### Poor video quality
+
 - Free tier models have quality limitations
 - Consider upgrading to paid tiers for production
 
 ### Slow generation
+
 - Video generation can take several minutes per clip
 - Use the job queue system to handle multiple requests
 
 ### Out of memory
+
 - Reduce the number of visual prompts in the script
 - Process jobs sequentially instead of in parallel

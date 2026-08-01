@@ -3,6 +3,7 @@
 This document describes the architectural patterns, design decisions, and conventions used throughout the AI Vibes Video Generation codebase.
 
 ## Table of Contents
+
 1. [Dependency Injection](#dependency-injection)
 2. [Decorator-Based Programming](#decorator-based-programming)
 3. [Modular Architecture](#modular-architecture)
@@ -23,18 +24,21 @@ This document describes the architectural patterns, design decisions, and conven
 **Usage:** All services are injected via constructor parameters
 
 **Example Locations:**
+
 - [script.service.ts:15-19](../../src/modules/script/script.service.ts#L15-L19)
 - [media.service.ts:17-21](../../src/modules/media/media.service.ts#L17-L21)
 - [editor.service.ts:13-16](../../src/modules/editor/editor.service.ts#L13-L16)
 - [video-generation.processor.ts:24-34](../../src/queues/video-generation.processor.ts#L24-L34)
 
 **Benefits:**
+
 - Testability through easy mocking
 - Loose coupling between components
 - Clear dependency declarations
 - Automatic lifecycle management
 
 **Convention:**
+
 ```typescript
 constructor(
   private readonly configService: ConfigService,
@@ -53,29 +57,35 @@ All dependencies use `private readonly` to ensure immutability and encapsulation
 **Decorator Categories:**
 
 ### Module Decorators
+
 - `@Module()` - Defines module boundaries, imports, providers, exports
 - See [app.module.ts:12](../../src/app.module.ts#L12), [script.module.ts:5](../../src/modules/script/script.module.ts#L5)
 
 ### Controller Decorators
+
 - `@Controller()` - Defines HTTP route prefix
 - `@Post()`, `@Get()` - HTTP method handlers
 - `@Body()`, `@Param()`, `@Query()` - Parameter extraction
 - See [app.controller.ts:13-17](../../src/app.controller.ts#L13-L17)
 
 ### Injectable Decorators
+
 - `@Injectable()` - Marks class as available for DI
 - Used on all services: [script.service.ts:14](../../src/modules/script/script.service.ts#L14)
 
 ### Job Processor Decorators
+
 - `@Processor('queue-name')` - Registers BullMQ processor
 - `@Process('job-name')` - Defines job handler method
 - See [video-generation.processor.ts:14](../../src/queues/video-generation.processor.ts#L14)
 
 ### Validation Decorators
+
 - `@IsString()`, `@IsNotEmpty()`, `@IsOptional()`, `@IsBoolean()`
 - See [generate-video.dto.ts:5-26](../../src/common/dto/generate-video.dto.ts#L5-L26)
 
 ### Documentation Decorators
+
 - `@ApiOperation()`, `@ApiResponse()`, `@ApiProperty()`
 - See [app.controller.ts:21-30](../../src/app.controller.ts#L21-L30)
 
@@ -86,6 +96,7 @@ All dependencies use `private readonly` to ensure immutability and encapsulation
 **Pattern:** Feature-based module organization with clear boundaries
 
 **Module Structure:**
+
 ```
 Module/
 ├── *.module.ts      # Module definition (@Module decorator)
@@ -94,6 +105,7 @@ Module/
 ```
 
 **Core Modules:**
+
 1. **ScriptModule** - AI script generation
    - Dependencies: FilesystemModule, ConfigModule
    - See [script.module.ts:5-10](../../src/modules/script/script.module.ts#L5-L10)
@@ -115,6 +127,7 @@ Module/
    - See [filesystem.module.ts:5-10](../../src/modules/filesystem/filesystem.module.ts#L5-L10)
 
 **Module Registration:**
+
 - All modules registered in [app.module.ts:31-35](../../src/app.module.ts#L31-L35)
 - ConfigModule set as global: [app.module.ts:14-17](../../src/app.module.ts#L14-L17)
 
@@ -125,19 +138,23 @@ Module/
 **Pattern:** BullMQ-based asynchronous job processing with Redis backend
 
 **Configuration:**
+
 - Queue registration: [app.module.ts:28-30](../../src/app.module.ts#L28-L30)
 - Redis connection: [app.module.ts:18-27](../../src/app.module.ts#L18-L27)
 
 **Job Creation:**
+
 - Controller adds job to queue: [app.controller.ts:37-58](../../src/app.controller.ts#L37-L58)
 - Retry strategy: 3 attempts with exponential backoff (5s initial delay)
 
 **Job Processing:**
+
 - Processor decorated with `@Processor('video-generation')`
 - Handler method: [video-generation.processor.ts:36-116](../../src/queues/video-generation.processor.ts#L36-L116)
 - Progress reporting at: 10%, 25%, 50%, 75%, 90%, 100%
 
 **Progress Tracking:**
+
 ```typescript
 await job.progress(25); // After script generation
 await job.progress(50); // After media generation
@@ -146,10 +163,12 @@ await job.progress(90); // After upload
 ```
 
 **Job Status Queries:**
+
 - Status endpoint: [app.controller.ts:67-100](../../src/app.controller.ts#L67-L100)
 - Returns job state, progress, and result
 
 **Benefits:**
+
 - Decouples request/response from long-running processes
 - Enables retry logic for transient failures
 - Provides progress visibility to clients
@@ -164,6 +183,7 @@ await job.progress(90); // After upload
 **DTO Location:** `src/common/dto/`
 
 **Validation Setup:**
+
 - Global ValidationPipe: [main.ts:10](../../src/main.ts#L10)
 - Automatic transformation and validation on all requests
 
@@ -171,16 +191,19 @@ await job.progress(90); // After upload
 See [generate-video.dto.ts:5-26](../../src/common/dto/generate-video.dto.ts#L5-L26)
 
 **Validation Decorators:**
+
 - `@IsString()` - Ensures string type
 - `@IsNotEmpty()` - Requires non-empty value
 - `@IsOptional()` - Allows undefined/null
 - `@IsBoolean()` - Ensures boolean type
 
 **Swagger Integration:**
+
 - `@ApiProperty()` - Documents required fields
 - `@ApiPropertyOptional()` - Documents optional fields
 
 **Benefits:**
+
 - Type safety at runtime
 - Automatic request validation
 - Self-documenting API (via Swagger)
@@ -193,6 +216,7 @@ See [generate-video.dto.ts:5-26](../../src/common/dto/generate-video.dto.ts#L5-L
 **Pattern:** Single Responsibility Principle - one service per domain
 
 **Service Characteristics:**
+
 - All services marked with `@Injectable()`
 - Constructor-based dependency injection
 - Private methods for internal logic
@@ -230,10 +254,12 @@ See [generate-video.dto.ts:5-26](../../src/common/dto/generate-video.dto.ts#L5-L
 **Pattern:** Environment-based configuration via ConfigModule
 
 **Setup:**
+
 - Global ConfigModule: [app.module.ts:14-17](../../src/app.module.ts#L14-L17)
 - Loads `.env` file at startup
 
 **Usage in Services:**
+
 ```typescript
 constructor(private readonly configService: ConfigService) {}
 
@@ -242,12 +268,14 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
 ```
 
 **Configuration Categories:**
-1. **API Keys:** GEMINI_API_KEY, HUGGINGFACE_API_KEY, YOUTUBE_*, TIKTOK_*
+
+1. **API Keys:** GEMINI*API_KEY, YOUTUBE*\_, TIKTOK\_\_
 2. **Infrastructure:** REDIS_HOST, REDIS_PORT, PORT
-3. **Providers:** HUGGINGFACE_VIDEO_PROVIDER, HUGGINGFACE_SPACE_NAME
+3. **Local Image Generation:** LOCAL_IMAGE_API_URL, LOCAL_IMAGE_MODEL (ComfyUI)
 4. **Paths:** TEMP_DIR, DEBUG_DIR
 
 **Benefits:**
+
 - Environment-specific configuration without code changes
 - Centralized configuration access
 - Type-safe configuration retrieval
@@ -267,9 +295,9 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
    - See [script.service.ts:60-84](../../src/modules/script/script.service.ts#L60-L84)
 
 2. **Video Generation Fallback**
-   - Primary: Hugging Face API
+   - Primary: ComfyUI (local SDXL image generation) + FFmpeg animation
    - Fallback: Placeholder video files
-   - See [media.service.ts:90-120](../../src/modules/media/media.service.ts#L90-L120)
+   - See [media.service.ts](../../src/modules/media/media.service.ts)
 
 3. **Audio Generation Fallback**
    - Primary: edge-tts CLI
@@ -282,10 +310,12 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
    - See [publisher.service.ts:70-80](../../src/modules/publisher/publisher.service.ts#L70-L80)
 
 **Error Logging:**
+
 - All services use NestJS Logger: `private readonly logger = new Logger(ServiceName.name);`
 - Errors logged with context: `this.logger.error('Message', error.stack);`
 
 **Benefits:**
+
 - System continues despite external API failures
 - Partial results better than complete failure
 - Clear error visibility through logging
@@ -318,6 +348,7 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
    - See [app.controller.ts:127-130](../../src/app.controller.ts#L127-L130)
 
 **Response Format Convention:**
+
 ```typescript
 {
   message: string,
@@ -329,11 +360,13 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
 ```
 
 **Swagger Documentation:**
+
 - Setup: [main.ts:16-26](../../src/main.ts#L16-L26)
 - Available at: `http://localhost:3000/docs`
 - All endpoints decorated with `@ApiOperation()`, `@ApiResponse()`
 
 **CORS:**
+
 - Enabled globally: [main.ts:13](../../src/main.ts#L13)
 
 ---
@@ -345,11 +378,13 @@ const port = this.configService.get<number>('REDIS_PORT') || 6379;
 ### Unit Testing
 
 **Structure:**
+
 - Test files: `*.spec.ts` alongside implementation
 - Test framework: Jest with ts-jest
 - Mocking: NestJS Testing utilities
 
 **Example Pattern:**
+
 ```typescript
 describe('ServiceName', () => {
   let service: ServiceName;
@@ -359,7 +394,7 @@ describe('ServiceName', () => {
     const module = await Test.createTestingModule({
       providers: [
         ServiceName,
-        { provide: Dependency, useValue: mockDependency }
+        { provide: Dependency, useValue: mockDependency },
       ],
     }).compile();
 
@@ -373,6 +408,7 @@ describe('ServiceName', () => {
 ```
 
 **Unit Test Examples:**
+
 - [script.service.spec.ts](../../src/modules/script/script.service.spec.ts)
 - [media.service.spec.ts](../../src/modules/media/media.service.spec.ts)
 - [editor.service.spec.ts](../../src/modules/editor/editor.service.spec.ts)
@@ -382,12 +418,14 @@ describe('ServiceName', () => {
 **Location:** `test/app.e2e-spec.ts`
 
 **Scope:**
+
 - Full application bootstrap
 - Real HTTP requests via supertest
 - Real Redis queue (requires running instance)
 - DTO validation testing
 
 **Pattern:**
+
 ```typescript
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -411,6 +449,7 @@ describe('AppController (e2e)', () => {
 ```
 
 **Test Coverage:**
+
 - Configuration: [package.json:80-83](../../package.json#L80-L83)
 - Excludes: `*.spec.ts`, `main.ts`
 - Run: `npm run test:cov`
@@ -434,12 +473,14 @@ describe('AppController (e2e)', () => {
 ## Migration & Scaling Considerations
 
 **Current Architecture Supports:**
+
 - Horizontal scaling of worker instances (multiple processors on same queue)
 - Separate deployment of API and processor components
 - Easy addition of new video providers or social platforms
 - Potential migration to microservices (modules are already isolated)
 
 **Future Enhancements:**
+
 - Replace BullMQ with cloud queue (SQS, Pub/Sub) for distributed deployment
 - Add caching layer (Redis) for script generation results
 - Implement webhook callbacks instead of polling

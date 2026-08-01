@@ -15,10 +15,11 @@ This guide provides instructions for deploying the AI Vibes Video Generation sys
 
 ### API Keys Required
 
-1. **Google Gemini API Key** (Free tier)
+1. **Google Gemini API Key** (Free tier, script generation)
    - Get from: https://makersuite.google.com/app/apikey
-2. **Hugging Face API Token** (Free tier)
-   - Get from: https://huggingface.co/settings/tokens
+2. **ComfyUI** (local scene image generation — no API key needed)
+   - Install: https://github.com/comfyanonymous/ComfyUI
+   - Download an SDXL checkpoint (e.g. `sd_xl_base_1.0.safetensors`) into `ComfyUI/models/checkpoints/`
 
 3. **YouTube Data API v3** (Optional - for uploads)
    - Setup OAuth2 credentials at: https://console.cloud.google.com/
@@ -99,24 +100,12 @@ Required environment variables:
 PORT=3000
 NODE_ENV=production
 
-# Google Gemini API
+# Google Gemini API (script generation)
 GEMINI_API_KEY=your_actual_api_key_here
 
-# Hugging Face API
-HUGGINGFACE_API_KEY=your_actual_api_key_here
-# Video generation provider: "space" (free) or "inference"
-HUGGINGFACE_VIDEO_PROVIDER=space
-
-# Hugging Face Space (default: genmo/mochi-1-preview)
-HUGGINGFACE_SPACE_NAME=genmo/mochi-1-preview
-HUGGINGFACE_SPACE_ENDPOINT=/predict
-# Optional: JSON array of inputs for the Space; use {{prompt}} as a placeholder
-# HUGGINGFACE_SPACE_INPUTS=["{{prompt}}"]
-
-# Inference API (legacy)
-HUGGINGFACE_VIDEO_MODEL=damo-vilab/text-to-video-ms-1.7b
-# Optional: override full inference URL (useful for private endpoints)
-# HUGGINGFACE_INFERENCE_URL=https://api-inference.huggingface.co/models/your-model
+# Local image generation via ComfyUI (free, runs on the host)
+LOCAL_IMAGE_API_URL=http://127.0.0.1:8188
+LOCAL_IMAGE_MODEL=sd_xl_base_1.0.safetensors
 
 # Redis
 REDIS_HOST=localhost
@@ -221,7 +210,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      # ComfyUI must be reachable from the container (e.g. host.docker.internal)
+      - LOCAL_IMAGE_API_URL=http://host.docker.internal:8188
+      - LOCAL_IMAGE_MODEL=${LOCAL_IMAGE_MODEL}
     volumes:
       - ./temp:/app/temp
       - ./debug:/app/debug
