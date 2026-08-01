@@ -51,9 +51,10 @@ src/
 ### Environment Setup
 
 1. Copy `.env.example` to `.env`
-2. Add required API keys: `GEMINI_API_KEY`, `KLING_ACCESS_KEY`, `KLING_SECRET_KEY`
-3. Configure Redis: `REDIS_HOST`, `REDIS_PORT` (defaults: localhost:6379)
-4. Optional: Add YouTube/TikTok credentials for uploads
+2. Add `GEMINI_API_KEY` for script generation
+3. Install and run ComfyUI locally, then set `LOCAL_IMAGE_API_URL` (default `http://127.0.0.1:8188`) and `LOCAL_IMAGE_MODEL` (e.g. `sd_xl_base_1.0.safetensors`) for scene image generation
+4. Configure Redis: `REDIS_HOST`, `REDIS_PORT` (defaults: localhost:6379)
+5. Optional: Add YouTube/TikTok credentials for uploads
 
 ### Development Commands
 
@@ -92,7 +93,7 @@ npm run format           # Prettier
 2. Controller creates job in BullMQ queue, returns `jobId`
 3. `VideoGenerationProcessor` handles job asynchronously:
    - **Step 1 (25%):** `ScriptService` generates script with Gemini AI
-   - **Step 2 (50%):** `MediaService` creates video clips, audio, subtitles
+   - **Step 2 (50%):** `MediaService` generates scene images via local ComfyUI, animates them into clips with FFmpeg, and creates audio + subtitles
    - **Step 3 (75%):** `EditorService` assembles final video with FFmpeg
    - **Step 4 (90%):** `PublisherService` uploads to social platforms (optional)
 4. Client polls `/video/status/:jobId` to track progress
