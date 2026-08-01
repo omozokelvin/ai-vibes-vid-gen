@@ -21,11 +21,7 @@ describe('MediaService', () => {
         ConfigModule.forRoot({
           isGlobal: true,
           ignoreEnvFile: true,
-          load: [
-            () => ({
-              HUGGINGFACE_API_KEY: undefined, // Don't set to test fallback behavior
-            }),
-          ],
+          load: [() => ({})],
         }),
       ],
       providers: [
@@ -159,13 +155,11 @@ describe('MediaService', () => {
   });
 
   describe('Configuration', () => {
-    it('should handle missing Hugging Face API key', () => {
-      // Service should be created even without API key
+    it('should default to the none provider when no local image endpoint is configured', () => {
+      // Service should be created even without a local image endpoint
       expect(service).toBeDefined();
 
-      // Access private property through reflection
-      const hfApiKey = (service as any).hfApiKey;
-      expect(hfApiKey).toBeUndefined();
+      expect((service as any).imageProvider).toBe('none');
     });
 
     it('should use FilesystemService for path operations', () => {
@@ -175,6 +169,33 @@ describe('MediaService', () => {
       mockFilesystemService.getTempPath(filename);
 
       expect(mockFilesystemService.getTempPath).toHaveBeenCalledWith(filename);
+    });
+
+    it('should select the local provider when a local image endpoint is configured', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({
+            isGlobal: true,
+            ignoreEnvFile: true,
+            load: [
+              () => ({
+                LOCAL_IMAGE_API_URL: 'http://127.0.0.1:8188',
+              }),
+            ],
+          }),
+        ],
+        providers: [
+          MediaService,
+          {
+            provide: FilesystemService,
+            useValue: mockFilesystemService,
+          },
+        ],
+      }).compile();
+
+      const localService = module.get<MediaService>(MediaService);
+
+      expect((localService as any).imageProvider).toBe('local');
     });
   });
 });

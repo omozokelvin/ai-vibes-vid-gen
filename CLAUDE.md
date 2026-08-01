@@ -8,7 +8,7 @@ AI-powered video generation system that creates videos from text prompts using o
 
 **Framework:** NestJS 10.0 (TypeScript 5.1)
 **Queue:** BullMQ with Redis backend
-**AI APIs:** Google Gemini (script), Kling AI (video), Hugging Face/Stable Horde (image fallback), Edge TTS (audio)
+**AI APIs:** Google Gemini (script), Google Veo (video), Kling AI/Stable Horde (fallback), Edge TTS (audio)
 **Media:** FFmpeg via fluent-ffmpeg
 **Social:** YouTube API v3, TikTok (placeholder)
 **Validation:** class-validator, class-transformer
@@ -98,11 +98,10 @@ npm run format           # Prettier
 ## Configuration
 
 **Critical Environment Variables:**
-- `GEMINI_API_KEY` - Google Gemini for script generation
-- `KLING_ACCESS_KEY` - Kling AI video generation (from klingai.com/global/dev)
+- `GEMINI_API_KEY` - Google Gemini for script generation AND Veo video generation
+- `GEMINI_VIDEO_MODEL` - Veo model (default: `veo-2.0-generate-001`, or `veo-3.1-generate-preview`)
+- `KLING_ACCESS_KEY` - Kling AI video generation fallback (from klingai.com/global/dev)
 - `KLING_SECRET_KEY` - Kling AI secret key
-- `KLING_MODEL` - Model version (default: kling-v2-master)
-- `KLING_MODE` - Generation mode: `std` or `pro`
 - `HUGGINGFACE_API_KEY` - Image generation (fallback)
 - `HUGGINGFACE_IMAGE_MODEL` - HF model ID (fallback)
 - `YOUTUBE_*` - YouTube upload credentials (optional)

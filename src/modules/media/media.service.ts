@@ -3,8 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import * as jwt from 'jsonwebtoken';
-import Replicate from 'replicate';
 import {
   VisualPrompt,
   ScriptData,
@@ -15,73 +13,28 @@ import { FilesystemService } from '../filesystem/filesystem.service';
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  private hfApiKey: string;
-  private hfModelId: string;
-  private replicate: Replicate | null = null;
-  private klingAccessKey: string;
-  private klingSecretKey: string;
-  private imageProvider:
-    | 'kling'
-    | 'huggingface'
-    | 'replicate'
-    | 'stablehorde'
-    | 'none';
+  private localImageApiUrl: string | null = null;
+  private imageProvider: 'local' | 'none';
 
   constructor(
     private configService: ConfigService,
     private filesystemService: FilesystemService,
   ) {
-    this.hfApiKey = this.configService.get<string>('HUGGINGFACE_API_KEY');
-    this.hfModelId =
-      this.configService.get<string>('HUGGINGFACE_IMAGE_MODEL') ||
-      'runwayml/stable-diffusion-v1-5';
-
-    // Provider is chosen based on which API keys are configured
-    // Priority: Kling AI > Replicate > Hugging Face > Stable Horde > None
-    const klingAccessKey = this.configService.get<string>('KLING_ACCESS_KEY');
-    const klingSecretKey = this.configService.get<string>('KLING_SECRET_KEY');
-    const replicateApiKey = this.configService.get<string>(
-      'REPLICATE_API_TOKEN',
+    this.localImageApiUrl = this.configService.get<string>(
+      'LOCAL_IMAGE_API_URL',
     );
 
-    if (klingAccessKey && klingSecretKey) {
-      this.imageProvider = 'kling';
+    if (this.localImageApiUrl) {
+      this.imageProvider = 'local';
       this.logger.log(
-        'Using Kling AI for real AI video generation (text-to-video)',
-      );
-      this.klingAccessKey = klingAccessKey;
-      this.klingSecretKey = klingSecretKey;
-    } else if (replicateApiKey) {
-      this.replicate = new Replicate({ auth: replicateApiKey });
-      this.imageProvider = 'replicate';
-      this.logger.log('Using Replicate for image generation');
-    } else if (this.hfApiKey) {
-      this.imageProvider = 'huggingface';
-      this.logger.log(
-        'Using Hugging Face for image generation (may fail with 410)',
+        `Using ComfyUI for local image generation: ${this.localImageApiUrl}`,
       );
     } else {
-      this.imageProvider = 'stablehorde';
-      this.logger.log(
-        'Using Stable Horde (FREE, no API key) for image generation',
-      );
+      this.imageProvider = 'none';
       this.logger.warn(
-        'Note: Free generation may be slow (30-120s per image) depending on community availability',
+        'No LOCAL_IMAGE_API_URL configured; scene clips will fall back to placeholder videos',
       );
     }
-  }
-
-  private getKlingToken(): string {
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: this.klingAccessKey,
-      exp: now + 1800,
-      nbf: now - 5,
-    };
-    return jwt.sign(payload, this.klingSecretKey, {
-      algorithm: 'HS256',
-      header: { alg: 'HS256', typ: 'JWT' },
-    });
   }
 
   async generateMedia(
@@ -246,378 +199,119 @@ export class MediaService {
     const videoFileName = `${jobId}_clip_${prompt.index}.mp4`;
     const outputPath = this.filesystemService.getTempPath(videoFileName);
 
-    // Try video/image generation based on available provider
-    if (this.imageProvider === 'kling') {
-      return this.generateVideoWithKling(prompt, jobId, outputPath);
-    } else if (this.imageProvider === 'stablehorde') {
-      return this.generateVideoFromImageStableHorde(prompt, jobId, outputPath);
-    } else if (this.imageProvider === 'replicate') {
-      return this.generateVideoFromImageReplicate(prompt, jobId, outputPath);
-    } else if (this.imageProvider === 'huggingface') {
-      return this.generateVideoFromImage(prompt, jobId, outputPath);
+    if (this.imageProvider === 'local') {
+      return this.generateVideoFromImageLocal(prompt, jobId, outputPath);
     }
 
     // Fallback to placeholder
-    this.logger.warn('No image generation API configured, using placeholder');
+    this.logger.warn('No local image generator configured, using placeholder');
     return this.createPlaceholderVideo(prompt, jobId);
   }
 
-  private async generateVideoWithKling(
+  private async generateVideoFromImageLocal(
     prompt: VisualPrompt,
     jobId: string,
     outputPath: string,
   ): Promise<string> {
-    const baseUrl = 'https://api-singapore.klingai.com';
+    const imageFileName = `${jobId}_image_${prompt.index}.png`;
+    const imagePath = this.filesystemService.getTempPath(imageFileName);
+
+    // LOCAL_IMAGE_API_URL is the ComfyUI base URL, e.g. http://127.0.0.1:8188
+    const baseUrl = (this.localImageApiUrl || 'http://127.0.0.1:8188').replace(
+      /\/+$/,
+      '',
+    );
 
     try {
-      const klingModel =
-        this.configService.get<string>('KLING_MODEL') || 'kling-v2-master';
-      const klingMode = this.configService.get<string>('KLING_MODE') || 'std';
-      const duration = prompt.duration <= 5 ? '5' : '10';
+      const checkpoint =
+        this.configService.get<string>('LOCAL_IMAGE_MODEL') ||
+        'sd_xl_base_1.0.safetensors';
 
       this.logger.log(
-        `Generating video with Kling AI (model: ${klingModel}, mode: ${klingMode}, duration: ${duration}s)`,
+        `Submitting image workflow to ComfyUI (${baseUrl}, checkpoint: ${checkpoint})`,
       );
 
-      const token = this.getKlingToken();
-      const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      };
+      // Step 1: Submit the SDXL workflow
+      const workflow = this.buildSdxlWorkflow(
+        prompt.prompt,
+        checkpoint,
+        1024,
+        576,
+      );
 
-      // Create text-to-video task
-      const taskResponse = await axios.post(
-        `${baseUrl}/v1/videos/text2video`,
+      const submitResponse = await axios.post(
+        `${baseUrl}/prompt`,
+        { prompt: workflow },
         {
-          prompt: prompt.prompt,
-          model_name: klingModel,
-          mode: klingMode,
-          duration: duration,
-          aspect_ratio: '16:9',
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 30000,
         },
-        { headers, timeout: 30000 },
       );
 
-      if (taskResponse.data.code !== 0) {
-        throw new Error(`Kling API error: ${taskResponse.data.message}`);
+      const promptId = submitResponse.data?.prompt_id;
+      if (!promptId) {
+        throw new Error('ComfyUI did not return a prompt_id');
       }
+      this.logger.log(`ComfyUI prompt submitted: ${promptId}`);
 
-      const taskId = taskResponse.data.data.task_id;
-      this.logger.log(`Kling AI task created: ${taskId}`);
+      // Step 2: Poll history until the job is done (max 3 minutes)
+      const maxAttempts = 36;
+      let images: Array<Record<string, string>> = [];
 
-      // Poll for result (max 5 minutes)
-      const maxAttempts = 60;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
 
-        const freshToken = this.getKlingToken();
-        const result = await axios.get(
-          `${baseUrl}/v1/videos/text2video/${taskId}`,
+        const historyResponse = await axios.get(
+          `${baseUrl}/history/${promptId}`,
           {
-            headers: {
-              Authorization: `Bearer ${freshToken}`,
-            },
             timeout: 15000,
           },
         );
 
-        const status = result.data.data.task_status;
+        const entry = historyResponse.data?.[promptId];
+        const status = entry?.status?.status_str;
 
-        if (status === 'succeed') {
-          const videoUrl = result.data.data.task_result?.videos?.[0]?.url;
-          if (!videoUrl) {
-            throw new Error('No video URL in Kling AI result');
-          }
-
-          this.logger.log('Kling AI video generated, downloading...');
-
-          const videoResponse = await axios.get(videoUrl, {
-            responseType: 'arraybuffer',
-            timeout: 60000,
-          });
-
-          fs.writeFileSync(outputPath, videoResponse.data);
-          this.logger.log(`Kling AI video saved: ${outputPath}`);
-
-          this.filesystemService.saveToDebug(
-            `${jobId}_clip_${prompt.index}.mp4`,
-            fs.readFileSync(outputPath),
-          );
-
-          return outputPath;
-        }
-
-        if (status === 'failed') {
+        if (status === 'success') {
+          images = Object.values(entry.outputs || {})
+            .flatMap((output: any) => output?.images || [])
+            .filter((img: any) => img?.filename);
+          if (images.length > 0) break;
+        } else if (status === 'error') {
           throw new Error(
-            `Kling AI task failed: ${result.data.data.task_status_msg || 'unknown reason'}`,
+            `ComfyUI job failed: ${JSON.stringify(entry.status.messages || {})}`,
           );
         }
 
         if (attempt % 6 === 0) {
           this.logger.log(
-            `Kling AI still processing... (${(attempt + 1) * 5}s elapsed, status: ${status})`,
+            `ComfyUI still processing... (${(attempt + 1) * 5}s elapsed)`,
           );
         }
       }
 
-      throw new Error('Kling AI task timed out after 5 minutes');
-    } catch (error) {
-      this.logger.error(`Kling AI error: ${error.message}`);
-      this.logger.warn('Falling back to placeholder video');
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
-  }
-
-  private async generateVideoFromImage(
-    prompt: VisualPrompt,
-    jobId: string,
-    outputPath: string,
-  ): Promise<string> {
-    const imageFileName = `${jobId}_image_${prompt.index}.png`;
-    const imagePath = this.filesystemService.getTempPath(imageFileName);
-
-    try {
-      // Generate image using Hugging Face Inference API
-      const inferenceUrl = `https://api-inference.huggingface.co/models/${this.hfModelId}`;
-
-      this.logger.log(`Generating image from: ${this.hfModelId}`);
-
-      const response = await axios.post(
-        inferenceUrl,
-        {
-          inputs: prompt.prompt,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.hfApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          responseType: 'arraybuffer',
-          timeout: 120000, // 2 minutes timeout
-        },
-      );
-
-      // Save the image
-      fs.writeFileSync(imagePath, response.data);
-      this.logger.log(`Image generated: ${imagePath}`);
-
-      // Convert image to video with zoom/pan effect using FFmpeg
-      await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
-
-      this.logger.log(`Video created from image: ${outputPath}`);
-
-      // Save to debug
-      this.filesystemService.saveToDebug(
-        `${jobId}_clip_${prompt.index}.mp4`,
-        fs.readFileSync(outputPath),
-      );
-
-      return outputPath;
-    } catch (error) {
-      const status = error?.response?.status;
-      if (status === 503) {
-        this.logger.warn(
-          `Model is loading (503). This usually takes 20-60 seconds. Retrying or using placeholder. Model: ${this.hfModelId}`,
-        );
-      } else if (status === 401) {
-        this.logger.error('Invalid Hugging Face API key (401)');
-      } else if (status === 410) {
-        this.logger.error(
-          `Model endpoint no longer available (410): ${this.hfModelId}. ` +
-            `Try alternative models: runwayml/stable-diffusion-v1-5, prompthero/openjourney, ` +
-            `stabilityai/stable-diffusion-xl-base-1.0, or black-forest-labs/FLUX.1-schnell`,
-        );
-      } else {
-        this.logger.error(
-          `Hugging Face API error (${status || 'unknown'}): ${error.message}`,
-        );
+      if (images.length === 0) {
+        throw new Error('ComfyUI job timed out or returned no images');
       }
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
-  }
 
-  private async generateVideoFromImageStableHorde(
-    prompt: VisualPrompt,
-    jobId: string,
-    outputPath: string,
-  ): Promise<string> {
-    const imageFileName = `${jobId}_image_${prompt.index}.png`;
-    const imagePath = this.filesystemService.getTempPath(imageFileName);
-
-    try {
-      this.logger.log(
-        'Requesting image from Stable Horde (FREE, community-powered)...',
-      );
-
-      // Step 1: Submit generation request
-      const requestBody = {
-        prompt: prompt.prompt,
+      // Step 3: Download the generated image
+      const image = images[0];
+      const viewResponse = await axios.get(`${baseUrl}/view`, {
         params: {
-          width: 1024, // Standard size for better compatibility
-          height: 576, // 16:9 ratio
-          steps: 20,
-          cfg_scale: 7.5,
-          sampler_name: 'k_euler_a',
-          n: 1,
+          filename: image.filename,
+          subfolder: image.subfolder || '',
+          type: image.type || 'output',
         },
-        nsfw: false,
-        censor_nsfw: true,
-        trusted_workers: false,
-        slow_workers: true,
-        workers: [],
-        models: [], // Empty = use any available model
-      };
-
-      const submitResponse = await axios.post(
-        'https://stablehorde.net/api/v2/generate/async',
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: '0000000000', // Anonymous API key
-            'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs', // Required by Stable Horde
-          },
-          timeout: 15000,
-        },
-      );
-
-      const requestId = submitResponse.data.id;
-      this.logger.log(`Stable Horde request submitted: ${requestId}`);
-      this.logger.log(
-        'Waiting for community workers to generate image (this may take 30-120 seconds)...',
-      );
-
-      // Step 2: Poll for result
-      let attempts = 0;
-      const maxAttempts = 40; // 40 attempts * 3 seconds = 2 minutes max
-
-      while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
-        attempts++;
-
-        const statusResponse = await axios.get(
-          `https://stablehorde.net/api/v2/generate/check/${requestId}`,
-          {
-            headers: {
-              'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs',
-            },
-            timeout: 10000,
-          },
-        );
-
-        const status = statusResponse.data;
-
-        if (status.done) {
-          this.logger.log('Image generation complete! Fetching result...');
-
-          // Step 3: Get the generated image
-          const resultResponse = await axios.get(
-            `https://stablehorde.net/api/v2/generate/status/${requestId}`,
-            {
-              headers: {
-                'Client-Agent': 'ai-vibes-vid-gen:1.0:nestjs',
-              },
-              timeout: 10000,
-            },
-          );
-
-          const imageUrl = resultResponse.data.generations[0]?.img;
-
-          if (!imageUrl) {
-            throw new Error('No image URL in response');
-          }
-
-          // Download the image
-          const imageResponse = await axios.get(imageUrl, {
-            responseType: 'arraybuffer',
-            timeout: 30000,
-          });
-
-          fs.writeFileSync(imagePath, imageResponse.data);
-          this.logger.log(`Image generated via Stable Horde: ${imagePath}`);
-
-          // Convert to video
-          await this.convertImageToVideo(
-            imagePath,
-            outputPath,
-            prompt.duration,
-          );
-          this.logger.log(`Video created from image: ${outputPath}`);
-
-          // Save to debug
-          this.filesystemService.saveToDebug(
-            `${jobId}_clip_${prompt.index}.mp4`,
-            fs.readFileSync(outputPath),
-          );
-
-          return outputPath;
-        }
-
-        if (status.faulted) {
-          throw new Error('Generation faulted on Stable Horde');
-        }
-
-        // Log progress every 5 attempts
-        if (attempts % 5 === 0) {
-          this.logger.log(
-            `Still waiting... (${attempts * 3}s elapsed, queue position: ${status.queue_position || 'unknown'})`,
-          );
-        }
-      }
-
-      throw new Error('Timeout waiting for Stable Horde generation');
-    } catch (error) {
-      this.logger.error(`Stable Horde error: ${error.message}`);
-      this.logger.warn(
-        'Falling back to placeholder video. For faster/reliable generation, consider Replicate API (~$0.003/image)',
-      );
-      return this.createPlaceholderVideo(prompt, jobId);
-    }
-  }
-
-  private async generateVideoFromImageReplicate(
-    prompt: VisualPrompt,
-    jobId: string,
-    outputPath: string,
-  ): Promise<string> {
-    const imageFileName = `${jobId}_image_${prompt.index}.png`;
-    const imagePath = this.filesystemService.getTempPath(imageFileName);
-
-    try {
-      this.logger.log('Generating image with Replicate API');
-
-      // Use SDXL for high-quality images
-      const output = (await this.replicate.run(
-        'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
-        {
-          input: {
-            prompt: prompt.prompt,
-            width: 1280,
-            height: 720,
-            num_outputs: 1,
-          },
-        },
-      )) as string[];
-
-      if (!output || output.length === 0) {
-        throw new Error('No image returned from Replicate');
-      }
-
-      // Download the image
-      const imageUrl = output[0];
-      const imageResponse = await axios.get(imageUrl, {
         responseType: 'arraybuffer',
+        timeout: 30000,
       });
 
-      fs.writeFileSync(imagePath, imageResponse.data);
-      this.logger.log(`Image generated via Replicate: ${imagePath}`);
+      fs.writeFileSync(imagePath, viewResponse.data);
+      this.logger.log(`Image generated via ComfyUI: ${imagePath}`);
 
-      // Convert image to video with zoom/pan effect
+      // Step 4: Animate the image into a video clip with FFmpeg
       await this.convertImageToVideo(imagePath, outputPath, prompt.duration);
+      this.logger.log(`Video created from local image: ${outputPath}`);
 
-      this.logger.log(`Video created from image: ${outputPath}`);
-
-      // Save to debug
       this.filesystemService.saveToDebug(
         `${jobId}_clip_${prompt.index}.mp4`,
         fs.readFileSync(outputPath),
@@ -625,9 +319,62 @@ export class MediaService {
 
       return outputPath;
     } catch (error) {
-      this.logger.error(`Replicate API error: ${error.message}`);
+      this.logger.error(`Local image API error: ${error.message}`);
       return this.createPlaceholderVideo(prompt, jobId);
     }
+  }
+
+  private buildSdxlWorkflow(
+    positivePrompt: string,
+    checkpoint: string,
+    width: number,
+    height: number,
+  ): Record<string, unknown> {
+    const seed = Math.floor(Math.random() * 1000000);
+    return {
+      '1': {
+        class_type: 'CheckpointLoaderSimple',
+        inputs: { ckpt_name: checkpoint },
+      },
+      '2': {
+        class_type: 'CLIPTextEncode',
+        inputs: { text: positivePrompt, clip: ['1', 1] },
+      },
+      '3': {
+        class_type: 'CLIPTextEncode',
+        inputs: { text: 'blurry, low quality, distorted', clip: ['1', 1] },
+      },
+      '4': {
+        class_type: 'EmptyLatentImage',
+        inputs: { width, height, batch_size: 1 },
+      },
+      '5': {
+        class_type: 'KSampler',
+        inputs: {
+          model: ['1', 0],
+          positive: ['2', 0],
+          negative: ['3', 0],
+          latent_image: ['4', 0],
+          seed,
+          steps: 20,
+          cfg: 7.5,
+          sampler_name: 'euler',
+          scheduler: 'normal',
+          denoise: 1.0,
+        },
+      },
+      '6': {
+        class_type: 'VAEDecode',
+        inputs: { samples: ['5', 0], vae: ['1', 2] },
+      },
+      '7': {
+        class_type: 'SaveImage',
+        inputs: {
+          images: ['6', 0],
+          filename_prefix: `ai_vibes_${Date.now()}`,
+        },
+      },
+    };
   }
 
   private convertImageToVideo(
