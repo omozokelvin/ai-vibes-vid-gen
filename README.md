@@ -269,7 +269,7 @@ This system uses **free APIs and local tools**:
 
 - Check that ComfyUI is running: `curl http://127.0.0.1:8188/system_stats`
 - Verify `LOCAL_IMAGE_API_URL` points at the ComfyUI base URL (no trailing slash)
-- Verify the SDXL checkpoint exists in `ComfyUI/models/checkpoints` and matches `LOCAL_IMAGE_MODEL`
+- Verify the Z-Image turbo model files are installed and match `LOCAL_IMAGE_MODEL` / `LOCAL_IMAGE_CLIP` / `LOCAL_IMAGE_VAE`
 - If ComfyUI fails, the pipeline falls back to blue placeholder clips — check `./debug` and the logs
 
 ### Audio Not Working
