@@ -92,8 +92,9 @@ export class VideoGenerationProcessor {
       }
       await job.progress(90);
 
-      // Clean up temp files (keep debug files)
-      // this.filesystemService.cleanupTemp(jobId);
+      // Clean up this job's temp files on success (keeps debug/ copies and videos/ output).
+      // On failure this is skipped so temp/ is left intact for troubleshooting.
+      this.filesystemService.cleanupTemp(jobId);
       await job.progress(100);
 
       this.logger.log(`Video generation completed: ${jobId}`);
