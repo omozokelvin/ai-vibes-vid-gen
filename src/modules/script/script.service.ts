@@ -32,7 +32,9 @@ export class ScriptService {
       return fallbackScript;
     }
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const modelName =
+      this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.5-flash';
+    const model = this.genAI.getGenerativeModel({ model: modelName });
 
     const systemPrompt = `You are a video script writer. Given a user prompt, generate a structured JSON response for a short video (30-60 seconds).
 
