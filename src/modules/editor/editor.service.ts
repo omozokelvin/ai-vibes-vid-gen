@@ -13,7 +13,7 @@ export class EditorService {
     this.logger.log('Starting video assembly');
 
     const outputFileName = `${jobId}_output.mp4`;
-    const outputPath = this.filesystemService.getTempPath(outputFileName);
+    const outputPath = this.filesystemService.getVideoPath(outputFileName);
 
     try {
       // Step 1: Concatenate video clips

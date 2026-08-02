@@ -8,6 +8,7 @@ describe('FilesystemService', () => {
   let service: FilesystemService;
   const testTempDir = './test-temp';
   const testDebugDir = './test-debug';
+  const testVideosDir = './test-videos';
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,6 +20,7 @@ describe('FilesystemService', () => {
             () => ({
               TEMP_DIR: testTempDir,
               DEBUG_DIR: testDebugDir,
+              VIDEOS_DIR: testVideosDir,
             }),
           ],
         }),
@@ -34,7 +36,7 @@ describe('FilesystemService', () => {
 
   afterEach(() => {
     // Cleanup test directories
-    [testTempDir, testDebugDir].forEach((dir) => {
+    [testTempDir, testDebugDir, testVideosDir].forEach((dir) => {
       if (fs.existsSync(dir)) {
         fs.rmSync(dir, { recursive: true, force: true });
       }
@@ -54,12 +56,20 @@ describe('FilesystemService', () => {
       expect(fs.existsSync(testDebugDir)).toBe(true);
     });
 
+    it('should create videos directory on module init', () => {
+      expect(fs.existsSync(testVideosDir)).toBe(true);
+    });
+
     it('should return correct temp directory path', () => {
       expect(service.getTempDir()).toBe(testTempDir);
     });
 
     it('should return correct debug directory path', () => {
       expect(service.getDebugDir()).toBe(testDebugDir);
+    });
+
+    it('should return correct videos directory path', () => {
+      expect(service.getVideosDir()).toBe(testVideosDir);
     });
   });
 
@@ -74,6 +84,12 @@ describe('FilesystemService', () => {
       const filename = 'test.json';
       const expectedPath = path.join(testDebugDir, filename);
       expect(service.getDebugPath(filename)).toBe(expectedPath);
+    });
+
+    it('should return correct videos file path', () => {
+      const filename = 'test.mp4';
+      const expectedPath = path.join(testVideosDir, filename);
+      expect(service.getVideoPath(filename)).toBe(expectedPath);
     });
   });
 

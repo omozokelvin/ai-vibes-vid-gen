@@ -39,9 +39,10 @@ lerna-debug.log*
 .env.local
 .env.production
 
-# Temp and debug files
+# Generated artifacts (temp processing, debug assets, finished videos)
 /temp
 /debug
+/videos
 *.mp4
 *.mp3
 *.srt

@@ -36,8 +36,9 @@ src/
 
 **Key Directories:**
 
-- `temp/` - Temporary processing files (cleaned up)
-- `debug/` - Preserved debug artifacts for troubleshooting
+- `temp/` - Intermediate processing files (clips, audio, srt) during a job
+- `debug/` - Preserved debug artifacts for troubleshooting (copies of clips/audio/script)
+- `videos/` - Final assembled videos (`{jobId}_output.mp4`)
 
 ## How to Build & Run
 
@@ -115,7 +116,7 @@ npm run format           # Prettier
 - `LOCAL_IMAGE_VAE` - Z-Image VAE file (default: `ae.safetensors`)
 - `YOUTUBE_*` - YouTube upload credentials (optional)
 - `REDIS_HOST`, `REDIS_PORT` - Job queue backend
-- `TEMP_DIR`, `DEBUG_DIR` - File storage paths
+- `TEMP_DIR`, `DEBUG_DIR`, `VIDEOS_DIR` - File storage paths
 
 See `.env.example` for full list.
 

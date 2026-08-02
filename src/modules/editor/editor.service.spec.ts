@@ -8,6 +8,7 @@ describe('EditorService', () => {
 
   const mockFilesystemService = {
     getTempPath: jest.fn((filename: string) => `./temp/${filename}`),
+    getVideoPath: jest.fn((filename: string) => `./videos/${filename}`),
     getTempDir: jest.fn().mockReturnValue('./temp'),
   };
 
@@ -33,12 +34,12 @@ describe('EditorService', () => {
   });
 
   describe('Path Construction', () => {
-    it('should construct correct output path', () => {
+    it('should construct correct output path in videos directory', () => {
       const jobId = 'test_job_123';
       const outputFileName = `${jobId}_output.mp4`;
-      const path = mockFilesystemService.getTempPath(outputFileName);
+      const path = mockFilesystemService.getVideoPath(outputFileName);
 
-      expect(path).toBe(`./temp/${outputFileName}`);
+      expect(path).toBe(`./videos/${outputFileName}`);
     });
 
     it('should construct correct concatenated video path', () => {
@@ -165,19 +166,25 @@ describe('EditorService', () => {
       expect(mockFilesystemService.getTempDir).toHaveBeenCalled();
     });
 
-    it('should construct paths for intermediate files', () => {
+    it('should construct paths for intermediate files in temp', () => {
       const jobId = 'test_job';
       const files = [
         `${jobId}_concatenated.mp4`,
         `${jobId}_trimmed.mp4`,
         `${jobId}_looped.mp4`,
-        `${jobId}_output.mp4`,
       ];
 
       files.forEach((file) => {
         const path = mockFilesystemService.getTempPath(file);
         expect(path).toBe(`./temp/${file}`);
       });
+    });
+
+    it('should construct the final output path in videos', () => {
+      const outputFileName = `test_job_output.mp4`;
+      const path = mockFilesystemService.getVideoPath(outputFileName);
+
+      expect(path).toBe(`./videos/${outputFileName}`);
     });
   });
 

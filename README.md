@@ -226,8 +226,9 @@ ai-vibes-vid-gen/
 │   ├── app.controller.ts
 │   ├── app.module.ts
 │   └── main.ts
-├── temp/          # Temporary files during processing
-├── debug/         # Debug files for troubleshooting
+├── temp/          # Intermediate processing files (clips, audio, srt)
+├── debug/         # Preserved debug artifacts for troubleshooting
+├── videos/        # Final assembled videos ({jobId}_output.mp4)
 ├── .env.example
 ├── package.json
 └── README.md

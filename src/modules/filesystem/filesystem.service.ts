@@ -8,10 +8,12 @@ export class FilesystemService implements OnModuleInit {
   private readonly logger = new Logger(FilesystemService.name);
   private tempDir: string;
   private debugDir: string;
+  private videosDir: string;
 
   constructor(private configService: ConfigService) {
     this.tempDir = this.configService.get<string>('TEMP_DIR') || './temp';
     this.debugDir = this.configService.get<string>('DEBUG_DIR') || './debug';
+    this.videosDir = this.configService.get<string>('VIDEOS_DIR') || './videos';
   }
 
   onModuleInit() {
@@ -19,7 +21,7 @@ export class FilesystemService implements OnModuleInit {
   }
 
   private ensureDirectories() {
-    [this.tempDir, this.debugDir].forEach((dir) => {
+    [this.tempDir, this.debugDir, this.videosDir].forEach((dir) => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
         this.logger.log(`Created directory: ${dir}`);
@@ -33,6 +35,10 @@ export class FilesystemService implements OnModuleInit {
 
   getDebugDir(): string {
     return this.debugDir;
+  }
+
+  getVideosDir(): string {
+    return this.videosDir;
   }
 
   saveToDebug(filename: string, content: any): string {
@@ -71,6 +77,10 @@ export class FilesystemService implements OnModuleInit {
 
   getDebugPath(filename: string): string {
     return path.join(this.debugDir, filename);
+  }
+
+  getVideoPath(filename: string): string {
+    return path.join(this.videosDir, filename);
   }
 
   cleanupTemp(jobId: string) {
