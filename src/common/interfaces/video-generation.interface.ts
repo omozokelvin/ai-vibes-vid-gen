@@ -16,6 +16,12 @@ export interface TimestampSegment {
   text: string;
 }
 
+export interface WordTiming {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface VideoGenerationJob {
   id: string;
   prompt: string;
