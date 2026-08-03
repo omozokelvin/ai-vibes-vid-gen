@@ -471,13 +471,12 @@ export class MediaService {
     height: number,
     numFrames: number,
     fps: number,
-    clipModel: string,
   ): Record<string, unknown> {
     const seed = Math.floor(Math.random() * 1000000);
     const prefix = `ai_vibes_${Date.now()}`;
 
     return {
-      // 1. Load T5 text encoder (for WanVideoTextEncode)
+      // 1. Load T5 text encoder (UMT5-XXL, required for Wan)
       '1': {
         class_type: 'LoadWanVideoT5TextEncoder',
         inputs: {
@@ -487,40 +486,8 @@ export class MediaService {
           quantization: 'disabled',
         },
       },
-      // 2. CLIP model for auxiliary conditioning (type=wan)
+      // 2. Wan T5 text encoding (primary text encoder)
       '2': {
-        class_type: 'CLIPLoader',
-        inputs: {
-          clip_name: clipModel,
-          type: 'wan',
-        },
-      },
-      // 3. CLIP positive encoding
-      '3': {
-        class_type: 'CLIPTextEncode',
-        inputs: {
-          text: positivePrompt,
-          clip: ['2', 0],
-        },
-      },
-      // 4. CLIP negative encoding
-      '4': {
-        class_type: 'CLIPTextEncode',
-        inputs: {
-          text: negativePrompt,
-          clip: ['2', 0],
-        },
-      },
-      // 5. Bridge CLIP conditioning to Wan text embeds
-      '5': {
-        class_type: 'WanVideoTextEmbedBridge',
-        inputs: {
-          positive: ['3', 0],
-          negative: ['4', 0],
-        },
-      },
-      // 6. Wan T5 text encoding (primary text encoder)
-      '6': {
         class_type: 'WanVideoTextEncode',
         inputs: {
           t5: ['1', 0],
@@ -531,8 +498,8 @@ export class MediaService {
           device: 'gpu',
         },
       },
-      // 7. Load Wan diffusion model (Wan 2.1 T2V 1.3B)
-      '7': {
+      // 3. Load Wan diffusion model (Wan 2.1 T2V 1.3B)
+      '3': {
         class_type: 'WanVideoModelLoader',
         inputs: {
           model: 'diffusion_pytorch_model.safetensors',
@@ -541,15 +508,16 @@ export class MediaService {
           load_device: 'main_device',
         },
       },
-      // 8. Load Wan VAE
-      '8': {
+      // 4. Load Wan VAE
+      '4': {
         class_type: 'WanVideoVAELoader',
         inputs: {
-          model_name: 'Wan2.1_VAE.pth',
+          model_name: 'Wan2_1_VAE_bf16.safetensors',
+          precision: 'bf16',
         },
       },
-      // 9. Empty video embeds (defines video dimensions and frame count)
-      '9': {
+      // 5. Empty video embeds (defines video dimensions and frame count)
+      '5': {
         class_type: 'WanVideoEmptyEmbeds',
         inputs: {
           width,
@@ -557,13 +525,13 @@ export class MediaService {
           num_frames: numFrames,
         },
       },
-      // 10. Wan sampler (generates latent video)
-      '10': {
+      // 6. Wan sampler (generates latent video)
+      '6': {
         class_type: 'WanVideoSampler',
         inputs: {
-          model: ['7', 0],
-          image_embeds: ['9', 0],
-          text_embeds: ['6', 0],
+          model: ['3', 0],
+          image_embeds: ['5', 0],
+          text_embeds: ['2', 0],
           steps: 20,
           cfg: 6.0,
           shift: 5.0,
@@ -573,12 +541,12 @@ export class MediaService {
           riflex_freq_index: 0,
         },
       },
-      // 11. Decode latent to image frames
-      '11': {
+      // 7. Decode latent to image frames
+      '7': {
         class_type: 'WanVideoDecode',
         inputs: {
-          vae: ['8', 0],
-          samples: ['10', 0],
+          vae: ['4', 0],
+          samples: ['6', 0],
           enable_vae_tiling: true,
           tile_x: 256,
           tile_y: 256,
@@ -586,19 +554,19 @@ export class MediaService {
           tile_stride_y: 128,
         },
       },
-      // 12. Combine frames into video
-      '12': {
+      // 8. Combine frames into video
+      '8': {
         class_type: 'CreateVideo',
         inputs: {
-          images: ['11', 0],
+          images: ['7', 0],
           fps,
         },
       },
-      // 13. Save video to output
-      '13': {
+      // 9. Save video to output
+      '9': {
         class_type: 'SaveVideo',
         inputs: {
-          video: ['12', 0],
+          video: ['8', 0],
           filename_prefix: prefix,
           format: 'video/h264-mp4',
         },
@@ -627,10 +595,6 @@ export class MediaService {
     // Ensure numFrames is 4n+1 for Wan
     const adjustedFrames = Math.floor(numFrames / 4) * 4 + 1;
 
-    const clipModel =
-      this.configService.get<string>('LOCAL_IMAGE_CLIP') ||
-      'umt5_xxl_fp16.safetensors';
-
     this.logger.log(
       `Submitting Wan T2V workflow (${width}x${height}, ${adjustedFrames}f, ${fps}fps)`,
     );
@@ -643,7 +607,6 @@ export class MediaService {
         height,
         adjustedFrames,
         fps,
-        clipModel,
       );
 
       // Step 1: Submit workflow
